@@ -8,8 +8,8 @@ the upper bound on wearable energy consumption for compute-heavy tasks.
 
 from __future__ import annotations
 
-from src.algorithms.base_scheduler import BaseScheduler
-from src.core.task import HealthcareTask
+from code.src.algorithms.base_scheduler import BaseScheduler
+from code.src.core.task import HealthcareTask
 
 
 class LocalOnlyScheduler(BaseScheduler):

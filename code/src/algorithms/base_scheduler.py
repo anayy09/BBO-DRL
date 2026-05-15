@@ -10,7 +10,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Dict, Optional, Tuple
 
-from src.core.cost_function import (
+from code.src.core.cost_function import (
     compute_cost,
     compute_local_energy,
     compute_local_latency,
@@ -19,8 +19,8 @@ from src.core.cost_function import (
     compute_privacy_risk,
     estimate_bounds,
 )
-from src.core.network import NetworkTopology
-from src.core.task import HealthcareTask
+from code.src.core.network import NetworkTopology
+from code.src.core.task import HealthcareTask
 
 
 class BaseScheduler(ABC):

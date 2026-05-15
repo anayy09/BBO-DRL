@@ -9,8 +9,8 @@ and end-to-end latency (due to WAN round-trip time).
 
 from __future__ import annotations
 
-from src.algorithms.base_scheduler import BaseScheduler
-from src.core.task import HealthcareTask
+from code.src.algorithms.base_scheduler import BaseScheduler
+from code.src.core.task import HealthcareTask
 
 
 class CloudOnlyScheduler(BaseScheduler):

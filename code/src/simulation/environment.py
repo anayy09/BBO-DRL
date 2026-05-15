@@ -20,7 +20,7 @@ from typing import Dict, List, Optional
 
 import numpy as np
 
-from src.core.cost_function import (
+from code.src.core.cost_function import (
     compute_local_energy,
     compute_local_latency,
     compute_offload_energy,
@@ -28,9 +28,9 @@ from src.core.cost_function import (
     compute_privacy_risk,
     estimate_bounds,
 )
-from src.core.network import NetworkTopology
-from src.core.task import HealthcareTask
-from src.algorithms.base_scheduler import BaseScheduler
+from code.src.core.network import NetworkTopology
+from code.src.core.task import HealthcareTask
+from code.src.algorithms.base_scheduler import BaseScheduler
 
 
 # ---------------------------------------------------------------------------
@@ -211,7 +211,7 @@ class OffloadingEnvironment:
         # --- Compute composite cost for diagnostics ---
         lat_bounds = (0.0, max(latency_s * 2.0, 1e-3))
         eng_bounds = (0.0, max(energy_j * 2.0, 1e-12))
-        from src.core.cost_function import compute_cost
+        from code.src.core.cost_function import compute_cost
         cost = compute_cost(
             latency_s, energy_j, privacy_risk,
             task.ci_score, lat_bounds, eng_bounds,

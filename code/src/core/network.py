@@ -17,7 +17,7 @@ import math
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
 
-from src.core.hardware_profiles import HardwareProfile
+from code.src.core.hardware_profiles import HardwareProfile
 
 
 # ---------------------------------------------------------------------------

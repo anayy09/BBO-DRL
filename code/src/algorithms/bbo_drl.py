@@ -35,15 +35,15 @@ from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 
-from src.algorithms.base_scheduler import BaseScheduler
-from src.core.cost_function import (
+from code.src.algorithms.base_scheduler import BaseScheduler
+from code.src.core.cost_function import (
     compute_cost,
     compute_normalized_weights,
     compute_offload_energy,
     compute_offload_latency,
     estimate_bounds,
 )
-from src.core.task import HealthcareTask
+from code.src.core.task import HealthcareTask
 
 
 # ===========================================================================

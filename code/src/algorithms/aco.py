@@ -29,8 +29,8 @@ from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 
-from src.algorithms.base_scheduler import BaseScheduler
-from src.core.task import HealthcareTask
+from code.src.algorithms.base_scheduler import BaseScheduler
+from code.src.core.task import HealthcareTask
 
 
 class ACOScheduler(BaseScheduler):

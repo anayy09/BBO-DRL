@@ -4,11 +4,11 @@ BASE = r"c:\Users\sinha\OneDrive - University of Florida\Papers\Bio-Inspired Ada
 DATA_DIR = os.path.join(BASE, "data")
 sys.path.insert(0, BASE)
 
-from src.data_ingestion.parse_mendeley import load_mendeley_events
-from src.data_ingestion.parse_ciciot import load_ciciot_events
-from src.data_ingestion.parse_medsec import load_medsec_events
-from src.data_ingestion.parse_mitbih import load_mitbih_events
-from src.data_ingestion.event_generator import generate_event_stream
+from code.src.data_ingestion.parse_mendeley import load_mendeley_events
+from code.src.data_ingestion.parse_ciciot import load_ciciot_events
+from code.src.data_ingestion.parse_medsec import load_medsec_events
+from code.src.data_ingestion.parse_mitbih import load_mitbih_events
+from code.src.data_ingestion.event_generator import generate_event_stream
 
 print("=" * 60)
 print("DATASET INGESTION TEST")

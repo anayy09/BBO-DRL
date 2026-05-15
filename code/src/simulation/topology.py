@@ -23,13 +23,13 @@ import math
 import random
 from typing import List, Tuple
 
-from src.core.hardware_profiles import (
+from code.src.core.hardware_profiles import (
     CLOUD_SERVER,
     EDGE_GATEWAY_RPI4,
     FOG_NODE,
     WEARABLE_ESP32,
 )
-from src.core.network import NetworkLink, NetworkNode, NetworkTopology
+from code.src.core.network import NetworkLink, NetworkNode, NetworkTopology
 
 
 # ---------------------------------------------------------------------------
