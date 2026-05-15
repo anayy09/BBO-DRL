@@ -1,1 +1,7 @@
 .claude/
+__pycache__/
+*.pyc
+*.pyo
+results/
+data/
+simulators/

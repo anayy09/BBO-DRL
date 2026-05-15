@@ -1,0 +1,108 @@
+simulation:
+  n_runs: 30
+  task_scales: [100, 500, 1000, 2000, 5000, 10000]
+  n_devices: 10
+  n_fog_nodes: 3
+  seed: 42
+
+network:
+  channel_bandwidth_mhz: 20
+  path_loss_exponent: 3.0
+  reference_distance_m: 1.0
+  noise_power_dbm: -100
+  cloud_rtt_ms: 80
+
+algorithms:
+  bbo_drl:
+    n_population: 20
+    max_iter_bbo: 30
+    n_candidate_nodes: 3
+    epsilon_start: 1.0
+    epsilon_end: 0.05
+    epsilon_decay: 0.995
+    gamma: 0.95
+    learning_rate: 0.001
+    replay_buffer_size: 10000
+    batch_size: 32
+    target_sync_freq: 50
+    hidden_dim: 64
+  pso:
+    n_particles: 30
+    max_iter: 50
+    inertia: 0.7
+    c1: 1.5
+    c2: 1.5
+  aco:
+    n_ants: 20
+    max_iter: 30
+    evaporation_rate: 0.1
+    alpha: 1
+    beta: 2
+    tau_init: 1.0
+  hs_hho:
+    n_agents: 30
+    max_iter: 50
+
+weights:
+  alpha_e: 3.0
+  beta_l: 4.0
+  gamma_p: 2.0
+
+hardware:
+  wearable:
+    device: ESP32-S3
+    cpu_freq_mhz: 240
+    kappa: 1.0e-27
+    tx_power_dbm: 22.5
+    idle_power_mw: 33
+    ram_kb: 512
+    bandwidth_mhz: 20
+    max_mips: 240
+  edge_gateway:
+    device: Raspberry Pi 4 (8 GB)
+    cpu_freq_mhz: 1500
+    kappa: 1.0e-28
+    idle_power_w: 3.4
+    ram_gb: 8
+    bandwidth_mhz: 100
+    max_mips: 1500
+  fog_node:
+    cpu_freq_mhz: 2200
+    kappa: 1.0e-28
+    idle_power_w: 5.0
+    ram_gb: 16
+    bandwidth_mhz: 100
+    max_mips: 2200
+  cloud:
+    cpu_freq_mhz: 3200
+    kappa: 0.0
+    idle_power_w: 0.0
+    ram_tb: 1
+    bandwidth_gbps: 1
+    max_mips: 3200
+
+task_profiles:
+  ecg_analysis:
+    data_size_bits: 40000000
+    cpu_cycles: 12000000
+    max_delay_s: 0.5
+    privacy_sensitivity: 0.9
+    default_ci: 0.85
+  spo2_monitoring:
+    data_size_bits: 40000
+    cpu_cycles: 500000
+    max_delay_s: 2.0
+    privacy_sensitivity: 0.6
+    default_ci: 0.4
+  bp_analysis:
+    data_size_bits: 400000
+    cpu_cycles: 2000000
+    max_delay_s: 1.0
+    privacy_sensitivity: 0.8
+    default_ci: 0.6
+  multi_vital:
+    data_size_bits: 8000000
+    cpu_cycles: 8000000
+    max_delay_s: 0.8
+    privacy_sensitivity: 0.85
+    default_ci: 0.75
