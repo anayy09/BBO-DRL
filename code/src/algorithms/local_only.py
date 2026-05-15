@@ -1,15 +1,15 @@
-"""
+﻿"""
 Local-Only baseline scheduler.
 
-All tasks are executed on the wearable device itself — no offloading.
+All tasks are executed on the wearable device itself â€” no offloading.
 This represents the lower bound on network usage and privacy risk, but
 the upper bound on wearable energy consumption for compute-heavy tasks.
 """
 
 from __future__ import annotations
 
-from code.src.algorithms.base_scheduler import BaseScheduler
-from code.src.core.task import HealthcareTask
+from src.algorithms.base_scheduler import BaseScheduler
+from src.core.task import HealthcareTask
 
 
 class LocalOnlyScheduler(BaseScheduler):
@@ -26,3 +26,4 @@ class LocalOnlyScheduler(BaseScheduler):
         node_id = task.device_id
         self.record_decision(task.device_id, node_id)
         return node_id
+

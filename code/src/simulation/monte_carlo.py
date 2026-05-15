@@ -1,11 +1,11 @@
-"""
+﻿"""
 Monte Carlo simulation runner.
 
 Executes the full comparative experiment:
   - 6 task scales: [100, 500, 1000, 2000, 5000, 10000]
-  - 30 Monte Carlo runs per (algorithm × scale) configuration
+  - 30 Monte Carlo runs per (algorithm Ã— scale) configuration
   - 6 algorithms: BBO-DRL, PSO, ACO, HS-HHO, LocalOnly, CloudOnly
-  - Results: mean ± std per metric, saved to JSON
+  - Results: mean Â± std per metric, saved to JSON
 
 Usage:
     python -m src.simulation.monte_carlo
@@ -28,23 +28,23 @@ _ROOT = Path(__file__).resolve().parent.parent.parent
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
-from code.src.algorithms.aco import ACOScheduler
-from code.src.algorithms.bbo_drl import BBODRLScheduler
-from code.src.algorithms.cloud_only import CloudOnlyScheduler
-from code.src.algorithms.hs_hho import HSHHOScheduler
-from code.src.algorithms.local_only import LocalOnlyScheduler
-from code.src.algorithms.pso import PSOScheduler
-from code.src.core.task import HealthcareTask
-from code.src.data_ingestion.event_generator import generate_event_stream
-from code.src.simulation.environment import OffloadingEnvironment
-from code.src.simulation.metrics import (
+from src.algorithms.aco import ACOScheduler
+from src.algorithms.bbo_drl import BBODRLScheduler
+from src.algorithms.cloud_only import CloudOnlyScheduler
+from src.algorithms.hs_hho import HSHHOScheduler
+from src.algorithms.local_only import LocalOnlyScheduler
+from src.algorithms.pso import PSOScheduler
+from src.core.task import HealthcareTask
+from src.data_ingestion.event_generator import generate_event_stream
+from src.simulation.environment import OffloadingEnvironment
+from src.simulation.metrics import (
     SimulationMetrics,
     aggregate_mc_runs,
     compare_algorithms,
     compute_metrics,
     metrics_to_dict,
 )
-from code.src.simulation.topology import build_healthcare_topology
+from src.simulation.topology import build_healthcare_topology
 
 # ---------------------------------------------------------------------------
 # Experiment constants
@@ -66,7 +66,7 @@ def build_algorithms(topology, seed: int = 42) -> Dict[str, object]:
 
     Returns
     -------
-    dict mapping algorithm_name → scheduler instance
+    dict mapping algorithm_name â†’ scheduler instance
     """
     return {
         'BBO-DRL':   BBODRLScheduler(topology, seed=seed),
@@ -93,14 +93,14 @@ def run_all_algorithms(
 
     Parameters
     ----------
-    n_tasks  : int — number of tasks in this run
-    run_id   : int — run index (used for seed offset)
+    n_tasks  : int â€” number of tasks in this run
+    run_id   : int â€” run index (used for seed offset)
     topology : NetworkTopology (freshly built for this run)
-    seed     : int — base random seed
+    seed     : int â€” base random seed
 
     Returns
     -------
-    dict mapping algorithm_name → SimulationMetrics
+    dict mapping algorithm_name â†’ SimulationMetrics
     """
     # Generate task stream for this run
     task_stream = generate_event_stream(
@@ -109,7 +109,7 @@ def run_all_algorithms(
         seed=seed + run_id,
     )
 
-    # Convert SimulationTask → HealthcareTask
+    # Convert SimulationTask â†’ HealthcareTask
     tasks = _to_healthcare_tasks(task_stream)
 
     # Compute simulation duration (max - min timestamp)
@@ -173,10 +173,10 @@ def run_monte_carlo(
 
     Parameters
     ----------
-    output_dir  : str  — directory to write JSON results
-    task_scales : list — override default TASK_SCALES
-    n_runs      : int  — number of MC iterations per configuration
-    verbose     : bool — print progress
+    output_dir  : str  â€” directory to write JSON results
+    task_scales : list â€” override default TASK_SCALES
+    n_runs      : int  â€” number of MC iterations per configuration
+    verbose     : bool â€” print progress
 
     Returns
     -------
@@ -206,7 +206,7 @@ def run_monte_carlo(
         )
 
         # Per-algorithm accumulator
-        # algo_name → list of SimulationMetrics
+        # algo_name â†’ list of SimulationMetrics
         algo_mc_results: Dict[str, List[SimulationMetrics]] = {
             'BBO-DRL':   [],
             'PSO':       [],
@@ -297,7 +297,7 @@ def _save_results(data: dict, path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Helper: SimulationTask → HealthcareTask
+# Helper: SimulationTask â†’ HealthcareTask
 # ---------------------------------------------------------------------------
 
 def _to_healthcare_tasks(sim_tasks) -> List[HealthcareTask]:
@@ -379,3 +379,4 @@ if __name__ == '__main__':
         n_runs=args.n_runs,
         verbose=not args.quiet,
     )
+

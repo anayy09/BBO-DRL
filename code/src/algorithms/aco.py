@@ -1,25 +1,25 @@
-"""
+﻿"""
 Ant Colony Optimization (ACO) scheduler for task offloading.
 
 Each ant selects a destination node using a pheromone-guided stochastic
 probability rule (analogous to the ACS/AS-based edge selection):
 
-  P(j | i) ∝ τ_{device,j}^α  ·  η_j^β
+  P(j | i) âˆ Ï„_{device,j}^Î±  Â·  Î·_j^Î²
 
 where:
-  τ_{device,j} = pheromone level for device → node j
-  η_j          = 1 / estimated_latency_j   (heuristic desirability)
-  α            = pheromone exponent (default 1)
-  β            = heuristic exponent  (default 2)
+  Ï„_{device,j} = pheromone level for device â†’ node j
+  Î·_j          = 1 / estimated_latency_j   (heuristic desirability)
+  Î±            = pheromone exponent (default 1)
+  Î²            = heuristic exponent  (default 2)
 
 Pheromone update (after all ants complete their tour):
-  τ_{device,j} ← (1 - ρ) · τ_{device,j} + Δτ_j
-  Δτ_j = Σ_{ants that chose j}  1 / F(x_{ant})
+  Ï„_{device,j} â† (1 - Ï) Â· Ï„_{device,j} + Î”Ï„_j
+  Î”Ï„_j = Î£_{ants that chose j}  1 / F(x_{ant})
 
 References:
   Dorigo, M., Maniezzo, V., & Colorni, A. (1996). Ant system: optimization
   by a colony of cooperating agents. IEEE Transactions on Systems, Man, and
-  Cybernetics-Part B (Cybernetics), 26(1), 29–41.
+  Cybernetics-Part B (Cybernetics), 26(1), 29â€“41.
 """
 
 from __future__ import annotations
@@ -29,8 +29,8 @@ from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 
-from code.src.algorithms.base_scheduler import BaseScheduler
-from code.src.core.task import HealthcareTask
+from src.algorithms.base_scheduler import BaseScheduler
+from src.core.task import HealthcareTask
 
 
 class ACOScheduler(BaseScheduler):
@@ -40,12 +40,12 @@ class ACOScheduler(BaseScheduler):
     Parameters
     ----------
     topology          : NetworkTopology
-    n_ants            : int   — colony size per iteration (default 20)
-    max_iter          : int   — ACO iterations per scheduling call (default 30)
-    evaporation_rate  : float — ρ, pheromone evaporation (default 0.1)
-    alpha_pheromone   : float — α, pheromone weight in probability (default 1)
-    beta_heuristic    : float — β, heuristic weight in probability (default 2)
-    tau_init          : float — initial pheromone value (default 1.0)
+    n_ants            : int   â€” colony size per iteration (default 20)
+    max_iter          : int   â€” ACO iterations per scheduling call (default 30)
+    evaporation_rate  : float â€” Ï, pheromone evaporation (default 0.1)
+    alpha_pheromone   : float â€” Î±, pheromone weight in probability (default 1)
+    beta_heuristic    : float â€” Î², heuristic weight in probability (default 2)
+    tau_init          : float â€” initial pheromone value (default 1.0)
     seed              : int
     offload_history   : dict
     """
@@ -76,7 +76,7 @@ class ACOScheduler(BaseScheduler):
 
         # Pheromone matrix: shape (n_devices, n_candidate_nodes)
         # Indexed by device_id (mapped via _device_to_row)
-        # We maintain a dict: device_id → np.ndarray of shape (n_nodes,)
+        # We maintain a dict: device_id â†’ np.ndarray of shape (n_nodes,)
         self._pheromones: Dict[int, np.ndarray] = {}
 
     # ------------------------------------------------------------------
@@ -99,7 +99,7 @@ class ACOScheduler(BaseScheduler):
     ) -> None:
         """
         Pheromone evaporation + deposit:
-          τ_j ← (1-ρ)·τ_j + Σ_{ants→j} (1/F_ant)
+          Ï„_j â† (1-Ï)Â·Ï„_j + Î£_{antsâ†’j} (1/F_ant)
         """
         tau = self._pheromones[device_id]
         # Evaporate
@@ -149,7 +149,7 @@ class ACOScheduler(BaseScheduler):
         -------
         (best_node_id, best_cost)
         """
-        # Pre-compute heuristic values η_j = 1 / latency_j
+        # Pre-compute heuristic values Î·_j = 1 / latency_j
         heuristics = self._compute_heuristics(task, lat_bounds, eng_bounds)
 
         tau = self._get_pheromones(task.device_id)
@@ -193,7 +193,7 @@ class ACOScheduler(BaseScheduler):
     ) -> Tuple[int, float]:
         """
         Probabilistic node selection for one ant:
-          P(j) = (τ_j^α · η_j^β) / Σ_k (τ_k^α · η_k^β)
+          P(j) = (Ï„_j^Î± Â· Î·_j^Î²) / Î£_k (Ï„_k^Î± Â· Î·_k^Î²)
         """
         attractiveness = (tau ** self.alpha) * (heuristics ** self.beta)
         total = attractiveness.sum()
@@ -219,7 +219,7 @@ class ACOScheduler(BaseScheduler):
         eng_bounds: Tuple[float, float],
     ) -> np.ndarray:
         """
-        η_j = 1 / estimated_latency_j  (heuristic desirability).
+        Î·_j = 1 / estimated_latency_j  (heuristic desirability).
         Uses a fast latency estimate (ignores queue delay for speed).
         """
         heuristics = np.zeros(self._n_nodes, dtype=float)
@@ -238,3 +238,4 @@ class ACOScheduler(BaseScheduler):
                 heuristics[k] = 1e-6
 
         return heuristics
+

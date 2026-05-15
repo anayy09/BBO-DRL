@@ -1,4 +1,4 @@
-"""
+﻿"""
 Hybrid Slime Mould Algorithm + Harris Hawks Optimization (SMA-HHO) scheduler.
 
 Combines two state-of-the-art swarm intelligence algorithms:
@@ -6,14 +6,14 @@ Combines two state-of-the-art swarm intelligence algorithms:
 SMA (Slime Mould Algorithm):
   - Adaptive weight W(t) based on fitness ranking
   - Oscillatory exploration: X_A/X_B selected from the swarm
-  - W(best) = 1 + r·log(bF/(bF+wF)+1)  for top half
-    W(others) = 1 - r·log(bF/(bF+wF)+1) for bottom half
+  - W(best) = 1 + rÂ·log(bF/(bF+wF)+1)  for top half
+    W(others) = 1 - rÂ·log(bF/(bF+wF)+1) for bottom half
 
 HHO (Harris Hawks Optimization):
-  - Rabbit energy E = 2·E0·(1 - t/T) models escaping prey
-  - |E| ≥ 1 → exploration (random perch or rabbit tracking)
-  - 0.5 ≤ |E| < 1 → soft besiege (gradual approach)
-  - |E| < 0.5 → hard besiege (rapid dive)
+  - Rabbit energy E = 2Â·E0Â·(1 - t/T) models escaping prey
+  - |E| â‰¥ 1 â†’ exploration (random perch or rabbit tracking)
+  - 0.5 â‰¤ |E| < 1 â†’ soft besiege (gradual approach)
+  - |E| < 0.5 â†’ hard besiege (rapid dive)
 
 Hybrid integration:
   At each iteration, each agent updates via SMA first, then the HHO
@@ -22,10 +22,10 @@ Hybrid integration:
 
 References:
   Li, S. et al. (2020). Slime mould algorithm: A new method for stochastic
-  optimization. Future Generation Computer Systems, 111, 300–323.
+  optimization. Future Generation Computer Systems, 111, 300â€“323.
 
   Heidari, A.A. et al. (2019). Harris hawks optimization: Algorithm and
-  applications. Future Generation Computer Systems, 97, 849–872.
+  applications. Future Generation Computer Systems, 97, 849â€“872.
 """
 
 from __future__ import annotations
@@ -35,8 +35,8 @@ from typing import List, Optional, Tuple
 
 import numpy as np
 
-from code.src.algorithms.base_scheduler import BaseScheduler
-from code.src.core.task import HealthcareTask
+from src.algorithms.base_scheduler import BaseScheduler
+from src.core.task import HealthcareTask
 
 
 class HSHHOScheduler(BaseScheduler):
@@ -46,8 +46,8 @@ class HSHHOScheduler(BaseScheduler):
     Parameters
     ----------
     topology      : NetworkTopology
-    n_agents      : int   — population size (default 30)
-    max_iter      : int   — iterations per scheduling call (default 50)
+    n_agents      : int   â€” population size (default 30)
+    max_iter      : int   â€” iterations per scheduling call (default 50)
     seed          : int
     offload_history : dict
     """
@@ -127,7 +127,7 @@ class HSHHOScheduler(BaseScheduler):
             W = self._sma_weights(fitness, sorted_idx, best_fit, worst_fit)
 
             # --- HHO energy (escaping energy) ---
-            E0 = self._rng.uniform(-1.0, 1.0)  # random initial energy ∈ [-1,1]
+            E0 = self._rng.uniform(-1.0, 1.0)  # random initial energy âˆˆ [-1,1]
             E = 2.0 * E0 * (1.0 - t / T)       # decreasing over time
 
             # --- Agent position update ---
@@ -182,10 +182,10 @@ class HSHHOScheduler(BaseScheduler):
         """
         Compute oscillatory SMA weight W for each agent.
 
-        W(i) = 1 + r · log( (bF)/(bF + wF) + 1 )  for top half (rank ≤ n/2)
-        W(i) = 1 - r · log( (bF)/(bF + wF) + 1 )  for bottom half
+        W(i) = 1 + r Â· log( (bF)/(bF + wF) + 1 )  for top half (rank â‰¤ n/2)
+        W(i) = 1 - r Â· log( (bF)/(bF + wF) + 1 )  for bottom half
 
-        where r ∈ [0,1] is a uniform random number per agent.
+        where r âˆˆ [0,1] is a uniform random number per agent.
         """
         n = len(fitness)
         W = np.zeros(n, dtype=float)
@@ -215,11 +215,11 @@ class HSHHOScheduler(BaseScheduler):
     ) -> float:
         """
         SMA position update (exploration phase):
-          p = tanh(|F_k - F_best|) / (|F_k| + ε)   — simplified to p=t/T
+          p = tanh(|F_k - F_best|) / (|F_k| + Îµ)   â€” simplified to p=t/T
           if rand < p:
-              X_k = X_rabbit - r1 * (X_rabbit - w * X_A)  — approach food
+              X_k = X_rabbit - r1 * (X_rabbit - w * X_A)  â€” approach food
           else:
-              X_k = X_rand               — random walk
+              X_k = X_rand               â€” random walk
         """
         n = len(X)
         p = t / T  # simplified oscillation probability
@@ -251,11 +251,11 @@ class HSHHOScheduler(BaseScheduler):
         T: int,
     ) -> float:
         """
-        Soft besiege with progressive rapid dives (0.5 ≤ |E| < 1):
-          ΔX = X_rabbit - X_k
-          X_new = (X_rabbit - E·|J·X_rabbit - X_k|)
+        Soft besiege with progressive rapid dives (0.5 â‰¤ |E| < 1):
+          Î”X = X_rabbit - X_k
+          X_new = (X_rabbit - EÂ·|JÂ·X_rabbit - X_k|)
 
-        J = 2·(1 - r) — random jump strength.
+        J = 2Â·(1 - r) â€” random jump strength.
         """
         J = 2.0 * (1.0 - self._rng.random())
         delta = abs(J * x_rabbit - x)
@@ -277,8 +277,8 @@ class HSHHOScheduler(BaseScheduler):
     ) -> float:
         """
         Hard besiege with phased rapid dives (|E| < 0.5):
-          Generate candidate dive:  Y = X_rabbit - E·|X_rabbit - X_k|
-          Generate candidate jump:  Z = Y + LF(D) — Lévy flight perturbation
+          Generate candidate dive:  Y = X_rabbit - EÂ·|X_rabbit - X_k|
+          Generate candidate jump:  Z = Y + LF(D) â€” LÃ©vy flight perturbation
           Accept whichever has better fitness.
         """
         # Use mean position as representative current agent position
@@ -295,14 +295,14 @@ class HSHHOScheduler(BaseScheduler):
         return Y_clipped if f_Y <= f_Z else Z_clipped
 
     # ------------------------------------------------------------------
-    # Lévy flight
+    # LÃ©vy flight
     # ------------------------------------------------------------------
 
     def _levy_flight(self, dim: float) -> float:
         """
-        Lévy flight step size:
-          LF = 0.01 · u / |v|^{1/β}
-        where u ~ N(0, σ_u²), v ~ N(0, 1), β = 1.5.
+        LÃ©vy flight step size:
+          LF = 0.01 Â· u / |v|^{1/Î²}
+        where u ~ N(0, Ïƒ_uÂ²), v ~ N(0, 1), Î² = 1.5.
         """
         beta = 1.5
         sigma_u = (
@@ -331,3 +331,4 @@ class HSHHOScheduler(BaseScheduler):
         node_id = self._idx_to_node[idx]
         cost, _, _, _ = self.evaluate_node(task, node_id, lat_bounds, eng_bounds)
         return cost
+

@@ -1,4 +1,4 @@
-"""
+﻿"""
 IoT-Edge-Cloud network model.
 
 Models:
@@ -17,7 +17,7 @@ import math
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
 
-from code.src.core.hardware_profiles import HardwareProfile
+from src.core.hardware_profiles import HardwareProfile
 
 
 # ---------------------------------------------------------------------------
@@ -25,10 +25,10 @@ from code.src.core.hardware_profiles import HardwareProfile
 # ---------------------------------------------------------------------------
 SPEED_OF_LIGHT_FIBER = 2e8       # m/s (signal speed in optical fiber / copper)
 BOLTZMANN_K = 1.38e-23           # J/K
-TEMPERATURE_K = 290.0            # standard temperature (290 K ≈ 17 °C)
+TEMPERATURE_K = 290.0            # standard temperature (290 K â‰ˆ 17 Â°C)
 REFERENCE_DISTANCE_M = 1.0       # d_0 for path-loss reference
 REFERENCE_GAIN_H0 = 1.0          # h_0 at d_0 (unit gain reference)
-AVG_CPU_CYCLES_PER_TASK = 6_000_000  # used in M/M/1 μ computation
+AVG_CPU_CYCLES_PER_TASK = 6_000_000  # used in M/M/1 Î¼ computation
 
 
 # ---------------------------------------------------------------------------
@@ -44,7 +44,7 @@ class NetworkNode:
     hardware: HardwareProfile
     position_km: Tuple[float, float] = (0.0, 0.0)   # (x, y) in kilometres
     current_load: int = 0     # number of tasks currently in queue
-    arrival_rate: float = 0.0  # λ — tasks/second arriving at this node
+    arrival_rate: float = 0.0  # Î» â€” tasks/second arriving at this node
 
 
 @dataclass
@@ -53,7 +53,7 @@ class NetworkLink:
     source_id: int
     dest_id: int
     distance_km: float
-    path_loss_exponent: float = 3.0   # α: 2.0 LOS, 3.5 NLOS, 3.0 typical indoor
+    path_loss_exponent: float = 3.0   # Î±: 2.0 LOS, 3.5 NLOS, 3.0 typical indoor
 
     @property
     def distance_m(self) -> float:
@@ -87,8 +87,8 @@ class NetworkTopology:
     def get_link(self, src_id: int, dst_id: int) -> NetworkLink:
         """
         Return the NetworkLink for (src_id, dst_id).
-        Falls back to a default long-haul link (50 km, α=2.0) for
-        wearable→cloud paths not explicitly registered (e.g. multi-hop).
+        Falls back to a default long-haul link (50 km, Î±=2.0) for
+        wearableâ†’cloud paths not explicitly registered (e.g. multi-hop).
         """
         if (src_id, dst_id) in self.links:
             return self.links[(src_id, dst_id)]
@@ -111,13 +111,13 @@ class NetworkTopology:
         channel_noise_dbm: float = -100.0,
     ) -> float:
         """
-        Shannon capacity R = B · log2(1 + SNR)  [bits/s]
+        Shannon capacity R = B Â· log2(1 + SNR)  [bits/s]
 
         Path-loss channel model:
-            h = h_0 · (d_0 / d)^α
-        where h_0 = 1 (0 dB at d_0 = 1 m), α = link.path_loss_exponent.
+            h = h_0 Â· (d_0 / d)^Î±
+        where h_0 = 1 (0 dB at d_0 = 1 m), Î± = link.path_loss_exponent.
 
-        SNR = P_tx · h / σ²   (no interference: I = 0)
+        SNR = P_tx Â· h / ÏƒÂ²   (no interference: I = 0)
 
         If src node has tx_power_w = 0 (receiver node), we use the
         destination node's bandwidth and a nominal SNR representing
@@ -133,19 +133,19 @@ class NetworkTopology:
         p_tx = src_node.hardware.tx_power_w
 
         if p_tx <= 0.0:
-            # Wired / fibre link — use destination bandwidth, assume high SNR
+            # Wired / fibre link â€” use destination bandwidth, assume high SNR
             B = dst_node.hardware.bandwidth_hz
             # Assume 30 dB SNR for wired link
             snr = 1000.0
             return B * math.log2(1.0 + snr)
 
-        # Noise power: σ² = k·T·B  (thermal noise floor) in watts
+        # Noise power: ÏƒÂ² = kÂ·TÂ·B  (thermal noise floor) in watts
         # Override with provided noise_dbm if it gives a higher noise floor
         noise_thermal_w = BOLTZMANN_K * TEMPERATURE_K * B
         noise_dbm_w = 10.0 ** ((channel_noise_dbm - 30.0) / 10.0)
         sigma_sq = max(noise_thermal_w, noise_dbm_w)
 
-        # Path-loss: h = (d_0/d)^alpha  — free-space + log-distance model
+        # Path-loss: h = (d_0/d)^alpha  â€” free-space + log-distance model
         d_m = max(link.distance_m, REFERENCE_DISTANCE_M)   # avoid d=0
         alpha = link.path_loss_exponent
         h = REFERENCE_GAIN_H0 * (REFERENCE_DISTANCE_M / d_m) ** alpha
@@ -166,12 +166,12 @@ class NetworkTopology:
         avg_cpu_cycles: float = AVG_CPU_CYCLES_PER_TASK,
     ) -> float:
         """
-        M/M/1 queueing delay W = λ / (μ · (μ - λ))  seconds.
+        M/M/1 queueing delay W = Î» / (Î¼ Â· (Î¼ - Î»))  seconds.
 
-        μ (service rate) = (max_mips × 10^6) / avg_cpu_cycles  [tasks/s]
-        λ (arrival rate) = node.arrival_rate  [tasks/s]
+        Î¼ (service rate) = (max_mips Ã— 10^6) / avg_cpu_cycles  [tasks/s]
+        Î» (arrival rate) = node.arrival_rate  [tasks/s]
 
-        Returns 999.0 if the node is overloaded (λ ≥ μ).
+        Returns 999.0 if the node is overloaded (Î» â‰¥ Î¼).
         """
         node = self.get_node(node_id)
 
@@ -181,13 +181,13 @@ class NetworkTopology:
         lam = node.arrival_rate
 
         if lam <= 0.0:
-            return 0.0   # no load — no queue delay
+            return 0.0   # no load â€” no queue delay
 
         if lam >= mu:
             return 999.0  # overloaded / unstable queue
 
-        # M/M/1 mean waiting time in queue (excluding service): W_q = λ/(μ(μ-λ))
-        # Mean time in system (including service): W = 1/(μ-λ)
+        # M/M/1 mean waiting time in queue (excluding service): W_q = Î»/(Î¼(Î¼-Î»))
+        # Mean time in system (including service): W = 1/(Î¼-Î»)
         # We return W (sojourn time) as the queuing component
         W = 1.0 / (mu - lam)
         return W
@@ -200,7 +200,7 @@ class NetworkTopology:
         """
         Propagation delay = distance / signal_speed
 
-        Uses SPEED_OF_LIGHT_FIBER (2×10^8 m/s) for both wireless and
+        Uses SPEED_OF_LIGHT_FIBER (2Ã—10^8 m/s) for both wireless and
         wired segments as a conservative average.
         """
         link = self.get_link(src_id, dst_id)
@@ -227,7 +227,7 @@ class NetworkTopology:
         )
 
     def update_arrival_rate(self, node_id: int, rate: float) -> None:
-        """Update the estimated arrival rate λ for M/M/1 computation."""
+        """Update the estimated arrival rate Î» for M/M/1 computation."""
         self.nodes[node_id].arrival_rate = max(0.0, rate)
 
     def __repr__(self) -> str:
@@ -235,3 +235,4 @@ class NetworkTopology:
             f"NetworkTopology("
             f"nodes={len(self.nodes)}, links={len(self.links)})"
         )
+

@@ -1,4 +1,4 @@
-"""
+﻿"""
 Cloud-Only baseline scheduler.
 
 All tasks are offloaded to the cloud server regardless of task type,
@@ -9,8 +9,8 @@ and end-to-end latency (due to WAN round-trip time).
 
 from __future__ import annotations
 
-from code.src.algorithms.base_scheduler import BaseScheduler
-from code.src.core.task import HealthcareTask
+from src.algorithms.base_scheduler import BaseScheduler
+from src.core.task import HealthcareTask
 
 
 class CloudOnlyScheduler(BaseScheduler):
@@ -40,3 +40,4 @@ class CloudOnlyScheduler(BaseScheduler):
         node_id = self._cloud_node_id
         self.record_decision(task.device_id, node_id)
         return node_id
+

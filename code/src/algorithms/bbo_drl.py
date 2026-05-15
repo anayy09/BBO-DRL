@@ -1,29 +1,29 @@
-"""
-Hybrid BBO-DRL Scheduler — core research contribution.
+﻿"""
+Hybrid BBO-DRL Scheduler â€” core research contribution.
 
 Architecture:
   1. DQN (numpy-based, no PyTorch dependency):
      - State: [bandwidth_norm, cpu_util_norm, rtt_norm, battery_norm, ci, attack_prob]
      - Action: selects top-K candidate node indices
-     - Reward: r = -F(x) + Φ·penalty_SLA  (CI-modulated)
+     - Reward: r = -F(x) + Î¦Â·penalty_SLA  (CI-modulated)
 
   2. Bombardier Beetle Optimizer (BBO):
      - Refines the DQN-selected K-node subspace using antenna-based search
      - Exploration: random antenna perturbation around best position
      - Exploitation: gradient-free step toward the best known position
-     - δ(t) = δ_0 · (1 - t/T_max)² — adaptive antenna length
+     - Î´(t) = Î´_0 Â· (1 - t/T_max)Â² â€” adaptive antenna length
 
   3. Hybrid flow:
-     - DQN narrows search to K ≪ N candidate nodes
+     - DQN narrows search to K â‰ª N candidate nodes
      - BBO performs fine-grained continuous optimisation within that subspace
      - DQN policy is updated online via experience replay (DQN training)
 
 References:
   Mnih, V. et al. (2015). Human-level control through deep reinforcement
-  learning. Nature, 518(7540), 529–533.
+  learning. Nature, 518(7540), 529â€“533.
 
   Wang, Y. et al. (2022). Bombardier beetle optimizer: A new metaheuristic
-  algorithm for continuous optimization. IEEE Access, 10, 35182–35196.
+  algorithm for continuous optimization. IEEE Access, 10, 35182â€“35196.
 """
 
 from __future__ import annotations
@@ -35,15 +35,15 @@ from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 
-from code.src.algorithms.base_scheduler import BaseScheduler
-from code.src.core.cost_function import (
+from src.algorithms.base_scheduler import BaseScheduler
+from src.core.cost_function import (
     compute_cost,
     compute_normalized_weights,
     compute_offload_energy,
     compute_offload_latency,
     estimate_bounds,
 )
-from code.src.core.task import HealthcareTask
+from src.core.task import HealthcareTask
 
 
 # ===========================================================================
@@ -103,14 +103,14 @@ class DQNNetwork:
     """
     Two-hidden-layer fully connected network implemented in pure NumPy.
 
-    Architecture: input → hidden1 (ReLU) → hidden2 (ReLU) → output (linear)
+    Architecture: input â†’ hidden1 (ReLU) â†’ hidden2 (ReLU) â†’ output (linear)
     Weights initialised with Xavier (Glorot) uniform initialisation.
 
     Parameters
     ----------
-    state_dim  : int — dimension of input state vector
-    action_dim : int — number of discrete actions (candidate nodes)
-    hidden_dim : int — neurons per hidden layer
+    state_dim  : int â€” dimension of input state vector
+    action_dim : int â€” number of discrete actions (candidate nodes)
+    hidden_dim : int â€” neurons per hidden layer
     """
 
     def __init__(
@@ -171,12 +171,12 @@ class DQNNetwork:
         Parameters
         ----------
         states  : np.ndarray (batch, state_dim)
-        targets : np.ndarray (batch, action_dim) — target Q-values
-        lr      : float — learning rate
+        targets : np.ndarray (batch, action_dim) â€” target Q-values
+        lr      : float â€” learning rate
 
         Returns
         -------
-        loss : float — mean squared error
+        loss : float â€” mean squared error
         """
         batch = states.shape[0]
 
@@ -243,7 +243,7 @@ class DQNNetwork:
 
 class BBOOptimizer:
     """
-    Bombardier Beetle Optimizer — antenna-based continuous optimiser.
+    Bombardier Beetle Optimizer â€” antenna-based continuous optimiser.
 
     The beetle explores using two virtual antennae symmetrically placed
     around its current position.  The antenna that senses a lower cost
@@ -251,22 +251,22 @@ class BBOOptimizer:
 
     Update rules:
       Exploration:
-        X_right = X + r1 * δ(t) * b  (right antenna)
-        X_left  = X - r1 * δ(t) * b  (left antenna)
-        X_k ← X + r1*(X_best - X_k) + r2*δ(t)*sign(rand-0.5)
+        X_right = X + r1 * Î´(t) * b  (right antenna)
+        X_left  = X - r1 * Î´(t) * b  (left antenna)
+        X_k â† X + r1*(X_best - X_k) + r2*Î´(t)*sign(rand-0.5)
 
       Exploitation:
         step = (X_best - X_k) / ||X_best - X_k||
-        X_k ← X + r3 * step * (X_best - X_k)
+        X_k â† X + r3 * step * (X_best - X_k)
 
       Antenna decay:
-        δ(t) = δ_0 · (1 - t/T_max)²
+        Î´(t) = Î´_0 Â· (1 - t/T_max)Â²
 
     Parameters
     ----------
-    n_pop    : int   — number of beetles
-    max_iter : int   — optimisation iterations
-    delta0   : float — initial antenna length
+    n_pop    : int   â€” number of beetles
+    max_iter : int   â€” optimisation iterations
+    delta0   : float â€” initial antenna length
     """
 
     def __init__(
@@ -292,9 +292,9 @@ class BBOOptimizer:
 
         Parameters
         ----------
-        cost_fn : callable(x: np.ndarray) → float
+        cost_fn : callable(x: np.ndarray) â†’ float
         bounds  : list of (lb, ub) per dimension
-        dim     : int — number of dimensions
+        dim     : int â€” number of dimensions
 
         Returns
         -------
@@ -370,31 +370,31 @@ class BBOOptimizer:
 
 class BBODRLScheduler(BaseScheduler):
     """
-    Hybrid BBO-DRL task offloading scheduler — core research contribution.
+    Hybrid BBO-DRL task offloading scheduler â€” core research contribution.
 
     DQN compresses the search space to top-K candidate nodes.
     BBO refines the selection within that K-node subspace.
     CI modulates the reward signal to prioritise critical tasks.
 
     DQN state vector (6-dimensional, all normalised to [0,1]):
-      [0] bandwidth_norm   — uplink rate / max_rate
-      [1] cpu_util_norm    — node.current_load / max_load
-      [2] rtt_norm         — round-trip time estimate / max_rtt
-      [3] battery_norm     — estimated battery proxy (1 for cloud, varies for others)
-      [4] ci               — Criticality Index Φ_i
-      [5] attack_prob      — adversarial threat p_{atk,i}
+      [0] bandwidth_norm   â€” uplink rate / max_rate
+      [1] cpu_util_norm    â€” node.current_load / max_load
+      [2] rtt_norm         â€” round-trip time estimate / max_rtt
+      [3] battery_norm     â€” estimated battery proxy (1 for cloud, varies for others)
+      [4] ci               â€” Criticality Index Î¦_i
+      [5] attack_prob      â€” adversarial threat p_{atk,i}
 
     Parameters
     ----------
     topology           : NetworkTopology
-    n_candidate_nodes  : int   — K, DQN selects top-K (default 3)
-    epsilon            : float — initial ε for ε-greedy exploration (default 1.0)
-    epsilon_decay      : float — decay per call to select_node (default 0.995)
-    epsilon_min        : float — minimum ε (default 0.05)
-    gamma              : float — DQN discount factor (default 0.95)
-    lr                 : float — DQN learning rate (default 0.001)
-    replay_capacity    : int   — replay buffer capacity (default 10_000)
-    target_sync_freq   : int   — steps between target network updates (default 50)
+    n_candidate_nodes  : int   â€” K, DQN selects top-K (default 3)
+    epsilon            : float â€” initial Îµ for Îµ-greedy exploration (default 1.0)
+    epsilon_decay      : float â€” decay per call to select_node (default 0.995)
+    epsilon_min        : float â€” minimum Îµ (default 0.05)
+    gamma              : float â€” DQN discount factor (default 0.95)
+    lr                 : float â€” DQN learning rate (default 0.001)
+    replay_capacity    : int   â€” replay buffer capacity (default 10_000)
+    target_sync_freq   : int   â€” steps between target network updates (default 50)
     seed               : int
     offload_history    : dict
     """
@@ -473,12 +473,12 @@ class BBODRLScheduler(BaseScheduler):
         """
         Build the 6-dimensional normalised state vector for (task, node_id).
 
-        [0] bandwidth_norm — uplink rate to node / reference max rate
-        [1] cpu_util_norm  — current node load / max_load
-        [2] rtt_norm       — estimated RTT / max_rtt
-        [3] battery_norm   — battery proxy (1.0 for cloud, lower for edge)
-        [4] ci             — task Criticality Index Φ_i
-        [5] attack_prob    — adversarial threat probability
+        [0] bandwidth_norm â€” uplink rate to node / reference max rate
+        [1] cpu_util_norm  â€” current node load / max_load
+        [2] rtt_norm       â€” estimated RTT / max_rtt
+        [3] battery_norm   â€” battery proxy (1.0 for cloud, lower for edge)
+        [4] ci             â€” task Criticality Index Î¦_i
+        [5] attack_prob    â€” adversarial threat probability
         """
         # [0] Bandwidth
         try:
@@ -491,14 +491,14 @@ class BBODRLScheduler(BaseScheduler):
         node = self.topology.get_node(node_id)
         cpu_util = min(node.current_load / self._max_load, 1.0)
 
-        # [2] RTT estimate (2 × propagation delay)
+        # [2] RTT estimate (2 Ã— propagation delay)
         try:
             prop = self.topology.get_propagation_delay(task.device_id, node_id)
         except Exception:
             prop = 0.25
         rtt_norm = min(2.0 * prop / self._max_rtt_s, 1.0)
 
-        # [3] Battery proxy: wired/cloud → 1.0, edge/fog → proportional to type
+        # [3] Battery proxy: wired/cloud â†’ 1.0, edge/fog â†’ proportional to type
         node_type = node.node_type
         if node_type == 'cloud':
             battery_norm = 1.0
@@ -535,9 +535,9 @@ class BBODRLScheduler(BaseScheduler):
     ) -> float:
         """
         CI-modulated reward:
-          r = -F(x) + Φ_i · bonus_if_sla_met - Φ_i · penalty_if_sla_violated
+          r = -F(x) + Î¦_i Â· bonus_if_sla_met - Î¦_i Â· penalty_if_sla_violated
 
-        F(x) ∈ [0, 1] so r ∈ approximately [-2, 1].
+        F(x) âˆˆ [0, 1] so r âˆˆ approximately [-2, 1].
         """
         # Estimate bounds for normalisation (approximation based on current topology)
         lat_bounds = (0.0, task.max_delay_s * 2.0)
@@ -568,7 +568,7 @@ class BBODRLScheduler(BaseScheduler):
         """
         Hybrid BBO-DRL node selection.
 
-        1. DQN (ε-greedy) selects top-K candidate node indices.
+        1. DQN (Îµ-greedy) selects top-K candidate node indices.
         2. BBO refines within those K nodes.
         3. Experience is stored for offline training.
         """
@@ -600,7 +600,7 @@ class BBODRLScheduler(BaseScheduler):
         action_idx = self._idx_to_node.index(best_node_id)
         reward = self.compute_reward(task, best_node_id, latency_s, energy_j, privacy_risk)
         next_state = self.get_state(task, best_node_id)
-        done = False  # continuous task stream — no terminal state
+        done = False  # continuous task stream â€” no terminal state
 
         self._replay.push(state, action_idx, reward, next_state, done)
 
@@ -621,12 +621,12 @@ class BBODRLScheduler(BaseScheduler):
         return best_node_id
 
     # ------------------------------------------------------------------
-    # DQN top-K selection (ε-greedy)
+    # DQN top-K selection (Îµ-greedy)
     # ------------------------------------------------------------------
 
     def _dqn_select_top_k(self, state: np.ndarray) -> List[int]:
         """
-        ε-greedy top-K action selection.
+        Îµ-greedy top-K action selection.
 
         During exploration: randomly sample K node indices.
         During exploitation: take the K highest Q-value actions.
@@ -676,7 +676,7 @@ class BBODRLScheduler(BaseScheduler):
         if K == 1:
             return self._idx_to_node[candidate_indices[0]]
 
-        # Map continuous position in [0, K-1] → candidate node
+        # Map continuous position in [0, K-1] â†’ candidate node
         def bbo_cost(x: np.ndarray) -> float:
             idx_in_k = int(round(float(np.clip(x[0], 0.0, K - 1.0))))
             node_global_idx = candidate_indices[idx_in_k]
@@ -699,11 +699,11 @@ class BBODRLScheduler(BaseScheduler):
         """
         Sample a mini-batch and perform one DQN Bellman update.
 
-        Target: Q_target(s, a) = r + γ · max_{a'} Q_target(s', a')
+        Target: Q_target(s, a) = r + Î³ Â· max_{a'} Q_target(s', a')
 
         Returns
         -------
-        loss : float — MSE loss for this update step.
+        loss : float â€” MSE loss for this update step.
         """
         if len(self._replay) < batch_size:
             return 0.0
@@ -742,3 +742,4 @@ class BBODRLScheduler(BaseScheduler):
                 self._total_loss / max(self._step_count, 1)
             ),
         }
+

@@ -1,4 +1,4 @@
-"""
+﻿"""
 Abstract base class for all task-offloading schedulers.
 
 Every concrete scheduler must implement `select_node(task)` and may
@@ -10,7 +10,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Dict, Optional, Tuple
 
-from code.src.core.cost_function import (
+from src.core.cost_function import (
     compute_cost,
     compute_local_energy,
     compute_local_latency,
@@ -19,8 +19,8 @@ from code.src.core.cost_function import (
     compute_privacy_risk,
     estimate_bounds,
 )
-from code.src.core.network import NetworkTopology
-from code.src.core.task import HealthcareTask
+from src.core.network import NetworkTopology
+from src.core.task import HealthcareTask
 
 
 class BaseScheduler(ABC):
@@ -81,20 +81,20 @@ class BaseScheduler(ABC):
 
         For the wearable's own node (local execution):
           - Latency  = C_i / f_local
-          - Energy   = κ · C_i · f²
+          - Energy   = Îº Â· C_i Â· fÂ²
           - Privacy  = 0  (data never leaves the device)
 
         For remote nodes:
           - Latency  = t_tx + t_prop + t_queue + t_proc
-          - Energy   = P_tx · t_tx + P_idle · (L - t_tx)
-          - Privacy  = ρ · (1 - H / H_max)
+          - Energy   = P_tx Â· t_tx + P_idle Â· (L - t_tx)
+          - Privacy  = Ï Â· (1 - H / H_max)
 
         Parameters
         ----------
         task           : HealthcareTask
-        node_id        : int — target node
-        latency_bounds : (l_min, l_max) in seconds   — for normalisation
-        energy_bounds  : (e_min, e_max) in joules    — for normalisation
+        node_id        : int â€” target node
+        latency_bounds : (l_min, l_max) in seconds   â€” for normalisation
+        energy_bounds  : (e_min, e_max) in joules    â€” for normalisation
 
         Returns
         -------
@@ -176,7 +176,7 @@ class BaseScheduler(ABC):
     ) -> Tuple[Tuple[float, float], Tuple[float, float]]:
         """
         Quick sweep over all candidate nodes to get min/max latency &
-        energy — used as normalisation bounds in compute_cost.
+        energy â€” used as normalisation bounds in compute_cost.
         """
         latencies: list[float] = []
         energies: list[float] = []
@@ -243,4 +243,5 @@ class BaseScheduler(ABC):
         return f"{self.__class__.__name__}(nodes={len(self._candidate_nodes)})"
 
 
-import math  # noqa: E402 — placed at bottom to avoid circular import issues
+import math  # noqa: E402 â€” placed at bottom to avoid circular import issues
+

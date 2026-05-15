@@ -1,11 +1,11 @@
-"""
+﻿"""
 Particle Swarm Optimization (PSO) scheduler for task offloading.
 
 Standard PSO formulation adapted for discrete node selection:
 
-  v_k(t+1) = w · v_k(t)
-            + c1 · r1 · (pbest_k - x_k(t))
-            + c2 · r2 · (gbest   - x_k(t))
+  v_k(t+1) = w Â· v_k(t)
+            + c1 Â· r1 Â· (pbest_k - x_k(t))
+            + c2 Â· r2 Â· (gbest   - x_k(t))
   x_k(t+1) = x_k(t) + v_k(t+1)
 
 Position is continuous in [0, n_nodes-1]; discretised to integer node index
@@ -13,7 +13,7 @@ for fitness evaluation.  Velocities are clamped to [-v_max, +v_max].
 
 References:
   Kennedy, J. & Eberhart, R. (1995). Particle swarm optimization.
-  IEEE ICNN, 1942–1948.
+  IEEE ICNN, 1942â€“1948.
 """
 
 from __future__ import annotations
@@ -23,8 +23,8 @@ from typing import List, Optional, Tuple
 
 import numpy as np
 
-from code.src.algorithms.base_scheduler import BaseScheduler
-from code.src.core.task import HealthcareTask
+from src.algorithms.base_scheduler import BaseScheduler
+from src.core.task import HealthcareTask
 
 
 class PSOScheduler(BaseScheduler):
@@ -34,13 +34,13 @@ class PSOScheduler(BaseScheduler):
     Parameters
     ----------
     topology        : NetworkTopology
-    n_particles     : int   — swarm size (default 30)
-    max_iter        : int   — iterations per scheduling decision (default 50)
-    inertia         : float — w, inertia weight (default 0.7)
-    c1              : float — cognitive coefficient (default 1.5)
-    c2              : float — social coefficient (default 1.5)
-    seed            : int   — random seed for reproducibility
-    offload_history : dict  — per-device offloading history
+    n_particles     : int   â€” swarm size (default 30)
+    max_iter        : int   â€” iterations per scheduling decision (default 50)
+    inertia         : float â€” w, inertia weight (default 0.7)
+    c1              : float â€” cognitive coefficient (default 1.5)
+    c2              : float â€” social coefficient (default 1.5)
+    seed            : int   â€” random seed for reproducibility
+    offload_history : dict  â€” per-device offloading history
     """
 
     def __init__(
@@ -64,7 +64,7 @@ class PSOScheduler(BaseScheduler):
 
         # Candidate nodes include all non-wearable nodes
         self._n_nodes = len(self._candidate_nodes)
-        # Map from index → actual node_id
+        # Map from index â†’ actual node_id
         self._idx_to_node: List[int] = self._candidate_nodes
 
         # Velocity maximum: span half the search space per step
@@ -185,3 +185,4 @@ class PSOScheduler(BaseScheduler):
         node_id = self._idx_to_node[idx]
         cost, _, _, _ = self.evaluate_node(task, node_id, lat_bounds, eng_bounds)
         return cost
+

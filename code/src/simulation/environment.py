@@ -1,4 +1,4 @@
-"""
+﻿"""
 Simulation environment for the IoT-Edge-Cloud task offloading system.
 
 The environment manages one round of scheduling decisions, tracking:
@@ -20,7 +20,7 @@ from typing import Dict, List, Optional
 
 import numpy as np
 
-from code.src.core.cost_function import (
+from src.core.cost_function import (
     compute_local_energy,
     compute_local_latency,
     compute_offload_energy,
@@ -28,15 +28,15 @@ from code.src.core.cost_function import (
     compute_privacy_risk,
     estimate_bounds,
 )
-from code.src.core.network import NetworkTopology
-from code.src.core.task import HealthcareTask
-from code.src.algorithms.base_scheduler import BaseScheduler
+from src.core.network import NetworkTopology
+from src.core.task import HealthcareTask
+from src.algorithms.base_scheduler import BaseScheduler
 
 
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
-BATTERY_CAPACITY_J = 0.5 * 3600.0   # 500 mAh @ 3.7 V ≈ 1850 J per wearable
+BATTERY_CAPACITY_J = 0.5 * 3600.0   # 500 mAh @ 3.7 V â‰ˆ 1850 J per wearable
 ATTACK_BURST_PROB = 0.05             # 5 % chance of attack burst per task arrival
 ATTACK_BURST_INTENSITY = 0.8        # attack probability during a burst
 
@@ -47,10 +47,10 @@ class OffloadingEnvironment:
 
     Parameters
     ----------
-    topology    : NetworkTopology  — network graph with all nodes and links
-    scheduler   : BaseScheduler    — the algorithm under test
-    n_tasks     : int              — total tasks in simulation (informational)
-    seed        : int              — RNG seed for reproducibility
+    topology    : NetworkTopology  â€” network graph with all nodes and links
+    scheduler   : BaseScheduler    â€” the algorithm under test
+    n_tasks     : int              â€” total tasks in simulation (informational)
+    seed        : int              â€” RNG seed for reproducibility
     """
 
     def __init__(
@@ -82,8 +82,8 @@ class OffloadingEnvironment:
         # State variables (reset on reset())
         self._battery_j: Dict[int, float] = {}
         self._queue_task_counts: Dict[int, int] = {}
-        self._time_window_s: float = 1.0      # sliding window for λ estimation
-        self._recent_arrivals: Dict[int, List[float]] = {}   # node_id → arrival times
+        self._time_window_s: float = 1.0      # sliding window for Î» estimation
+        self._recent_arrivals: Dict[int, List[float]] = {}   # node_id â†’ arrival times
 
         self.reset()
 
@@ -211,7 +211,7 @@ class OffloadingEnvironment:
         # --- Compute composite cost for diagnostics ---
         lat_bounds = (0.0, max(latency_s * 2.0, 1e-3))
         eng_bounds = (0.0, max(energy_j * 2.0, 1e-12))
-        from code.src.core.cost_function import compute_cost
+        from src.core.cost_function import compute_cost
         cost = compute_cost(
             latency_s, energy_j, privacy_risk,
             task.ci_score, lat_bounds, eng_bounds,
@@ -273,7 +273,7 @@ class OffloadingEnvironment:
 
     def _update_arrival_rates(self, current_time: float) -> None:
         """
-        Update arrival rates λ for each node using a sliding time window.
+        Update arrival rates Î» for each node using a sliding time window.
         Prune arrivals older than _time_window_s from the history.
         """
         for nid in self.topology.nodes:
@@ -282,7 +282,7 @@ class OffloadingEnvironment:
             arrivals = [t for t in self._recent_arrivals.get(nid, []) if t > cutoff]
             self._recent_arrivals[nid] = arrivals
 
-            # λ = count / window_s
+            # Î» = count / window_s
             lam = len(arrivals) / self._time_window_s
             self.topology.update_arrival_rate(nid, lam)
 
@@ -297,3 +297,4 @@ class OffloadingEnvironment:
     def get_queue_loads(self) -> Dict[int, int]:
         """Return current queue task count per node."""
         return {nid: n.current_load for nid, n in self.topology.nodes.items()}
+

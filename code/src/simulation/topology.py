@@ -1,19 +1,19 @@
-"""
+﻿"""
 Healthcare simulation topology builder.
 
 Topology structure:
-  N wearables  →  1 edge gateway  →  K fog nodes  →  1 cloud
+  N wearables  â†’  1 edge gateway  â†’  K fog nodes  â†’  1 cloud
 
 Physical placement:
   - Wearables: randomly within 50 m radius of edge gateway (origin)
   - Edge gateway: at origin (0, 0) km
-  - Fog nodes: at 1–5 km from edge
+  - Fog nodes: at 1â€“5 km from edge
   - Cloud: at 50 km (abstracted WAN distance)
 
 Node ID assignment:
-  - Wearables:     0 … N-1
+  - Wearables:     0 â€¦ N-1
   - Edge gateway:  N
-  - Fog nodes:     N+1 … N+K
+  - Fog nodes:     N+1 â€¦ N+K
   - Cloud:         N+K+1
 """
 
@@ -23,13 +23,13 @@ import math
 import random
 from typing import List, Tuple
 
-from code.src.core.hardware_profiles import (
+from src.core.hardware_profiles import (
     CLOUD_SERVER,
     EDGE_GATEWAY_RPI4,
     FOG_NODE,
     WEARABLE_ESP32,
 )
-from code.src.core.network import NetworkLink, NetworkNode, NetworkTopology
+from src.core.network import NetworkLink, NetworkNode, NetworkTopology
 
 
 # ---------------------------------------------------------------------------
@@ -66,7 +66,7 @@ def build_healthcare_topology(
     for i in range(n_wearables):
         # Random placement within 50 m radius of edge gateway
         angle_rad = rng.uniform(0.0, 2.0 * math.pi)
-        radius_km = rng.uniform(0.005, 0.05)  # 5–50 m converted to km
+        radius_km = rng.uniform(0.005, 0.05)  # 5â€“50 m converted to km
         x_km = radius_km * math.cos(angle_rad)
         y_km = radius_km * math.sin(angle_rad)
 
@@ -82,7 +82,7 @@ def build_healthcare_topology(
         topology.add_node(wearable)
 
     # ------------------------------------------------------------------
-    # 2. Edge gateway (MEC layer) — at origin
+    # 2. Edge gateway (MEC layer) â€” at origin
     # ------------------------------------------------------------------
     edge_id = n_wearables
     edge_gateway = NetworkNode(
@@ -97,7 +97,7 @@ def build_healthcare_topology(
     topology.add_node(edge_gateway)
 
     # ------------------------------------------------------------------
-    # 3. Fog nodes (fog/MEC layer) — 1–5 km from edge
+    # 3. Fog nodes (fog/MEC layer) â€” 1â€“5 km from edge
     # ------------------------------------------------------------------
     fog_angles = [
         (2.0 * math.pi * k / n_fog_nodes) for k in range(n_fog_nodes)
@@ -122,7 +122,7 @@ def build_healthcare_topology(
         fog_ids.append(fog_id)
 
     # ------------------------------------------------------------------
-    # 4. Cloud server — modelled as 50 km WAN distance from edge
+    # 4. Cloud server â€” modelled as 50 km WAN distance from edge
     # ------------------------------------------------------------------
     cloud_id = n_wearables + n_fog_nodes + 1
     cloud_node = NetworkNode(
@@ -139,7 +139,7 @@ def build_healthcare_topology(
     # ------------------------------------------------------------------
     # 5. Add directed links
     # ------------------------------------------------------------------
-    # 5a. Wearable → Edge gateway (Wi-Fi, NLOS typical indoor α=3.0)
+    # 5a. Wearable â†’ Edge gateway (Wi-Fi, NLOS typical indoor Î±=3.0)
     for i in range(n_wearables):
         wearable_pos = topology.nodes[i].position_km
         edge_pos = topology.nodes[edge_id].position_km
@@ -151,8 +151,8 @@ def build_healthcare_topology(
             path_loss_exponent=3.0,              # NLOS indoor/body area
         ))
 
-    # 5b. Wearable → direct to each fog node (multi-hop via edge; modelled
-    #     as path loss over combined distance with NLOS, α=3.5)
+    # 5b. Wearable â†’ direct to each fog node (multi-hop via edge; modelled
+    #     as path loss over combined distance with NLOS, Î±=3.5)
     for i in range(n_wearables):
         for fog_id in fog_ids:
             wearable_pos = topology.nodes[i].position_km
@@ -165,7 +165,7 @@ def build_healthcare_topology(
                 path_loss_exponent=3.5,   # NLOS multi-hop
             ))
 
-    # 5c. Wearable → Cloud (via edge + WAN; high path-loss, long distance)
+    # 5c. Wearable â†’ Cloud (via edge + WAN; high path-loss, long distance)
     for i in range(n_wearables):
         topology.add_link(NetworkLink(
             source_id=i,
@@ -174,7 +174,7 @@ def build_healthcare_topology(
             path_loss_exponent=2.0,   # LOS modelled for WAN fibre
         ))
 
-    # 5d. Edge → Fog nodes (5G NR backhaul, LOS, α=2.5)
+    # 5d. Edge â†’ Fog nodes (5G NR backhaul, LOS, Î±=2.5)
     for fog_id in fog_ids:
         edge_pos = topology.nodes[edge_id].position_km
         fog_pos = topology.nodes[fog_id].position_km
@@ -186,7 +186,7 @@ def build_healthcare_topology(
             path_loss_exponent=2.5,
         ))
 
-    # 5e. Edge → Cloud (fibre WAN)
+    # 5e. Edge â†’ Cloud (fibre WAN)
     topology.add_link(NetworkLink(
         source_id=edge_id,
         dest_id=cloud_id,
@@ -194,7 +194,7 @@ def build_healthcare_topology(
         path_loss_exponent=2.0,
     ))
 
-    # 5f. Fog → Cloud (fibre backhaul)
+    # 5f. Fog â†’ Cloud (fibre backhaul)
     for fog_id in fog_ids:
         fog_pos = topology.nodes[fog_id].position_km
         cloud_pos = topology.nodes[cloud_id].position_km
@@ -226,7 +226,7 @@ def _euclidean_km(pos_a: Tuple[float, float], pos_b: Tuple[float, float]) -> flo
 
 
 # ---------------------------------------------------------------------------
-# Convenience accessor — node ID helpers
+# Convenience accessor â€” node ID helpers
 # ---------------------------------------------------------------------------
 
 def get_wearable_ids(topology: NetworkTopology) -> List[int]:
@@ -246,3 +246,4 @@ def get_cloud_id(topology: NetworkTopology) -> int:
     if not cloud_nodes:
         raise RuntimeError("No cloud node found in topology.")
     return cloud_nodes[0]
+
