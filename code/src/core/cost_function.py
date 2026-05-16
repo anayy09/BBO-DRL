@@ -67,24 +67,56 @@ def compute_normalized_weights(ci: float) -> Tuple[float, float, float]:
     """
     Return (ŵ_E, ŵ_L, ŵ_P) normalised so that ŵ_E + ŵ_L + ŵ_P = 1.
 
-    Parameters
-    ----------
-    ci : float
-        Criticality Index Φ ∈ [0, 1].
-
-    Returns
-    -------
-    (ŵ_E, ŵ_L, ŵ_P) : tuple of floats, each in [0, 1], summing to 1.
+    Dispatches to the currently active weight mode (default: 'nonlinear',
+    the paper's proposed CI-adaptive non-linear scheme).  Mode can be
+    overridden globally via `set_weight_mode()` for Fix 6 (ablation).
     """
     ci = float(max(0.0, min(1.0, ci)))
+    mode = WEIGHT_MODE
+    if mode == 'flat':
+        return 1.0 / 3.0, 1.0 / 3.0, 1.0 / 3.0
+    if mode == 'step':
+        if ci > 0.5:
+            return 0.1, 0.8, 0.1
+        return 0.7, 0.15, 0.15
+    if mode == 'linear':
+        wl = ci
+        we = (1.0 - ci) / 2.0
+        wp = (1.0 - ci) / 2.0
+        total = we + wl + wp
+        return we / total, wl / total, wp / total
+    # default: 'nonlinear' (proposed)
     we = weight_energy(ci)
     wl = weight_latency(ci)
     wp = weight_privacy(ci)
     total = we + wl + wp
     if total < 1e-12:
-        # Degenerate case: distribute equally
         return 1.0 / 3.0, 1.0 / 3.0, 1.0 / 3.0
     return we / total, wl / total, wp / total
+
+
+# ---------------------------------------------------------------------------
+# Weight-mode switch  (Fix 6: ablation of CI-adaptive weight design)
+# ---------------------------------------------------------------------------
+WEIGHT_MODE: str = 'nonlinear'   # 'flat' | 'step' | 'linear' | 'nonlinear'
+
+
+def set_weight_mode(mode: str) -> None:
+    """
+    Switch the global CI-weight scheme.  Allowed values:
+      'nonlinear' — proposed exponential / power weights (paper's design)
+      'flat'      — equal 1/3 weights regardless of CI
+      'step'      — piecewise constant at CI=0.5 threshold
+      'linear'    — w_L=Φ, w_E=w_P=(1-Φ)/2  (then normalised)
+    """
+    global WEIGHT_MODE
+    if mode not in ('flat', 'step', 'linear', 'nonlinear'):
+        raise ValueError(f"Unknown weight mode: {mode}")
+    WEIGHT_MODE = mode
+
+
+def get_weight_mode() -> str:
+    return WEIGHT_MODE
 
 
 # ---------------------------------------------------------------------------

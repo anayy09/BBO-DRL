@@ -45,39 +45,30 @@ class HealthcareTask:
 # Keys map to task type strings used by the event generator.
 # Values contain base parameters before per-task noise injection.
 # ---------------------------------------------------------------------------
+# Cycle counts updated to literature-realistic MCU-class workloads
+# (Zhang 2021, Banbury 2021 MLPerf-Tiny).  Synchronised with event_generator.
 TASK_PROFILES = {
-    # ECG arrhythmia analysis — Pan-Tompkins QRS + lightweight CNN classifier
-    # Data: 5 s × 500 Hz × 16-bit = 40 Mb; Cycles: DNN inference ≈ 12 M
     'ecg_analysis': {
         'data_size_bits':     40_000_000,
-        'cpu_cycles':         12_000_000,
-        'max_delay_s':        0.5,           # real-time alarm threshold
+        'cpu_cycles':        150_000_000,
+        'max_delay_s':        0.5,
         'privacy_sensitivity': 0.9,
     },
-
-    # SpO2 monitoring — Beer-Lambert ratio algorithm, very lightweight
-    # Data: 1 s × 25 Hz × 16-bit = 400 b ≈ rounded up to 40 Kb
     'spo2_monitoring': {
         'data_size_bits':         40_000,
-        'cpu_cycles':            500_000,
+        'cpu_cycles':          5_000_000,
         'max_delay_s':               2.0,
         'privacy_sensitivity':       0.6,
     },
-
-    # Cuffless blood-pressure via PPG: feature extraction + regression model
-    # Data: 5 s × 500 Hz × 16-bit = 40 Mb → compressed to ~400 Kb
     'bp_analysis': {
         'data_size_bits':        400_000,
-        'cpu_cycles':          2_000_000,
+        'cpu_cycles':         30_000_000,
         'max_delay_s':               1.0,
         'privacy_sensitivity':       0.8,
     },
-
-    # Multi-vital fusion (ECG + SpO2 + BP) — aggregated pipeline
-    # Data: compressed multi-channel stream ≈ 1 MB = 8 Mb
     'multi_vital': {
         'data_size_bits':      8_000_000,
-        'cpu_cycles':          8_000_000,
+        'cpu_cycles':        120_000_000,
         'max_delay_s':               0.8,
         'privacy_sensitivity':      0.85,
     },

@@ -465,6 +465,9 @@ class BBODRLScheduler(BaseScheduler):
         # Previous state/action for replay (per device)
         self._prev: Dict[int, Optional[Tuple[np.ndarray, int]]] = {}
 
+        # Epsilon trajectory (Fix 7: convergence figure)
+        self.epsilon_history: List[float] = []
+
     # ------------------------------------------------------------------
     # State vector construction
     # ------------------------------------------------------------------
@@ -610,6 +613,7 @@ class BBODRLScheduler(BaseScheduler):
 
         # Epsilon decay
         self.epsilon = max(self.epsilon_min, self.epsilon * self.epsilon_decay)
+        self.epsilon_history.append(self.epsilon)
 
         self._step_count += 1
 

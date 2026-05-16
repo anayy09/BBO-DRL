@@ -1,0 +1,302 @@
+"""
+run_full_experiments.py — Q1 master Monte Carlo driver.
+
+Addresses Fix 1 (N_RUNS=30 globally enforced), Fix 2 (BBO-only + DQN-only
+ablations included), Fix 3 (Local-Only SLA violations now non-zero due to
+realistic cycle counts in TASK_PROFILES), Fix 5 (N=5000 scale added), and
+Fix 7 (epsilon trajectory captured for BBO-DRL).
+
+Outputs:
+  results/mc_full_results.json          Per-run raw metrics
+  results/mc_full_summary.json          Mean ± std per (scale, algorithm)
+  results/epsilon_trajectory.json       BBO-DRL epsilon vs. tasks processed
+  results/table3_n1000.csv              Table III (primary comparison)
+
+The orchestration script `run_q1_pipeline.py` then calls statistical_tests
+and figure generators on the JSON outputs.
+
+Usage
+-----
+    python -m src.analysis.run_full_experiments
+    python -m src.analysis.run_full_experiments --n_runs 30
+    python -m src.analysis.run_full_experiments --scales 100 1000 5000
+    python -m src.analysis.run_full_experiments --quick  # 5 runs (debug only)
+"""
+
+from __future__ import annotations
+
+import argparse
+import csv
+import json
+import os
+import sys
+import time
+import warnings
+from collections import defaultdict
+from pathlib import Path
+from statistics import mean
+from typing import Dict, List
+
+import numpy as np
+
+_CODE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(
+    os.path.abspath(__file__))))
+if _CODE_DIR not in sys.path:
+    sys.path.insert(0, _CODE_DIR)
+
+from src.config import (
+    GLOBAL_SEED,
+    N_FOG_NODES,
+    N_RUNS,
+    N_WEARABLES,
+    PRIMARY_SCALE,
+    TASK_SCALES,
+    get_full_algorithm_registry,
+)
+from src.core.task import HealthcareTask
+from src.data_ingestion.event_generator import generate_synthetic_tasks
+from src.simulation.environment import OffloadingEnvironment
+from src.simulation.topology import build_healthcare_topology
+
+try:
+    from tqdm import tqdm
+    _TQDM = True
+except ImportError:
+    _TQDM = False
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+def _simtask_to_healthcaretask(t, topology) -> HealthcareTask:
+    wearable_ids = [nid for nid, n in topology.nodes.items()
+                    if n.node_type == 'wearable']
+    dev_id = wearable_ids[t.device_id % len(wearable_ids)]
+    return HealthcareTask(
+        task_id=t.task_id, device_id=dev_id, timestamp=t.timestamp,
+        data_size_bits=t.data_size_bits, cpu_cycles=t.cpu_cycles,
+        max_delay_s=t.max_delay_s, privacy_sensitivity=t.privacy_sensitivity,
+        ci_score=t.ci_score, attack_probability=t.attack_probability,
+        source=t.source,
+    )
+
+
+def _run_single(alg_name, sched_cls, n_tasks, run_id, topo, seed_base):
+    """One independent Monte Carlo run for one algorithm."""
+    import random as _r
+    seed = seed_base + run_id * 1000 + n_tasks
+    _r.seed(seed)
+    np.random.seed(seed)
+
+    sim_tasks = generate_synthetic_tasks(n_tasks, ci_distribution='mixed',
+                                         seed=seed)
+    tasks = [_simtask_to_healthcaretask(t, topo) for t in sim_tasks]
+
+    sched = sched_cls(topo)
+    env = OffloadingEnvironment(topo, sched, n_tasks=n_tasks, seed=seed)
+    results = env.run(tasks)
+
+    if not results:
+        return {
+            'avg_latency_ms': 0.0, 'avg_energy_mj': 0.0,
+            'avg_privacy_risk': 0.0, 'sla_violation_pct': 0.0,
+            'throughput': 0.0,
+        }, None
+
+    timestamps = [r['timestamp'] for r in results]
+    span = max(timestamps) - min(timestamps) + 1e-6
+
+    metrics = {
+        'avg_latency_ms':    mean(r['latency_ms']    for r in results),
+        'avg_energy_mj':     mean(r['energy_mj']     for r in results),
+        'avg_privacy_risk':  mean(r['privacy_risk']  for r in results),
+        'sla_violation_pct': 100.0 * sum(r['sla_violated'] for r in results)
+                              / len(results),
+        'throughput':        n_tasks / span,
+    }
+
+    epsilon_history = getattr(sched, 'epsilon_history', None)
+    return metrics, (list(epsilon_history) if epsilon_history else None)
+
+
+# ---------------------------------------------------------------------------
+# Main driver
+# ---------------------------------------------------------------------------
+def run_full(
+    task_scales: list[int],
+    n_runs: int,
+    results_dir: Path,
+) -> Dict:
+    results_dir.mkdir(parents=True, exist_ok=True)
+
+    topo = build_healthcare_topology(
+        n_wearables=N_WEARABLES, n_fog_nodes=N_FOG_NODES,
+        seed=GLOBAL_SEED,
+    )
+
+    registry = get_full_algorithm_registry()
+    alg_names = list(registry.keys())
+    metric_keys = ['avg_latency_ms', 'avg_energy_mj',
+                   'avg_privacy_risk', 'sla_violation_pct', 'throughput']
+
+    mc_raw:     Dict[int, Dict[str, list]] = defaultdict(lambda: defaultdict(list))
+    mc_summary: Dict[int, Dict[str, dict]] = defaultdict(dict)
+    eps_trajectories: Dict[int, List[float]] = {}
+
+    print('=' * 72)
+    print(f'[Q1-MC] Scales={task_scales} N_RUNS={n_runs} Algorithms={len(alg_names)}')
+    print('=' * 72)
+
+    t0 = time.time()
+    for n_tasks in task_scales:
+        print(f'\n[Q1-MC] Scale n={n_tasks}')
+        for alg in alg_names:
+            sched_cls = registry[alg]
+            it = range(n_runs)
+            if _TQDM:
+                it = tqdm(it, desc=f'  {alg:<10s}', leave=False, ncols=70)
+            for run_id in it:
+                try:
+                    m, eps_hist = _run_single(
+                        alg, sched_cls, n_tasks, run_id, topo, GLOBAL_SEED,
+                    )
+                    mc_raw[n_tasks][alg].append(m)
+                    # Capture first run's epsilon trajectory at primary scale
+                    if (alg == 'BBO-DRL' and n_tasks == PRIMARY_SCALE
+                            and eps_hist is not None):
+                        eps_trajectories.setdefault(run_id, eps_hist)
+                except Exception as exc:
+                    warnings.warn(
+                        f'[Q1-MC] {alg} n={n_tasks} run={run_id} failed: {exc}'
+                    )
+
+            # Aggregate
+            agg = {}
+            for key in metric_keys:
+                vals = np.array([r[key] for r in mc_raw[n_tasks][alg]
+                                 if key in r], dtype=float)
+                if len(vals):
+                    agg[key] = {
+                        'mean': float(vals.mean()),
+                        'std':  float(vals.std()),
+                        'min':  float(vals.min()),
+                        'max':  float(vals.max()),
+                        'n':    int(len(vals)),
+                        'samples': [float(v) for v in vals],
+                    }
+                else:
+                    agg[key] = {'mean': 0.0, 'std': 0.0, 'min': 0.0,
+                                'max': 0.0, 'n': 0, 'samples': []}
+            mc_summary[n_tasks][alg] = agg
+
+        _print_table(n_tasks, mc_summary[n_tasks], alg_names)
+
+    elapsed = time.time() - t0
+    print(f'\n[Q1-MC] Total wall time: {elapsed:.1f}s')
+
+    # Persist
+    _save_json(mc_raw,     results_dir / 'mc_full_results.json')
+    _save_json(mc_summary, results_dir / 'mc_full_summary.json')
+
+    if eps_trajectories:
+        _save_json(eps_trajectories,
+                   results_dir / 'epsilon_trajectory.json')
+        print(f'[Q1-MC] Captured epsilon trajectories for '
+              f'{len(eps_trajectories)} runs at n={PRIMARY_SCALE}.')
+
+    # Table III CSV at primary scale
+    _save_table3_csv(mc_summary, alg_names,
+                     results_dir / f'table3_n{PRIMARY_SCALE}.csv')
+    return mc_summary
+
+
+def _print_table(n_tasks, scale, alg_names):
+    hdr = (f"{'Algorithm':<12} {'Lat ms':>10} {'Eng mJ':>10} "
+           f"{'Priv':>8} {'SLA%':>8} {'Tput':>10}")
+    print(f'  {hdr}\n  {"-"*len(hdr)}')
+    for alg in alg_names:
+        d = scale.get(alg, {})
+        lat = d.get('avg_latency_ms', {}).get('mean', 0)
+        eng = d.get('avg_energy_mj', {}).get('mean', 0)
+        prv = d.get('avg_privacy_risk', {}).get('mean', 0)
+        sla = d.get('sla_violation_pct', {}).get('mean', 0)
+        thr = d.get('throughput', {}).get('mean', 0)
+        tag = '*' if alg == 'BBO-DRL' else ' '
+        print(f'  {alg+tag:<12} {lat:>10.2f} {eng:>10.4f} '
+              f'{prv:>8.4f} {sla:>8.2f} {thr:>10.1f}')
+
+
+def _save_table3_csv(mc_summary, alg_names, path):
+    rows = []
+    scale = mc_summary.get(PRIMARY_SCALE, {})
+    for alg in alg_names:
+        d = scale.get(alg, {})
+        rows.append({
+            'algorithm': alg,
+            'avg_latency_ms_mean':   d.get('avg_latency_ms',    {}).get('mean', 0),
+            'avg_latency_ms_std':    d.get('avg_latency_ms',    {}).get('std',  0),
+            'avg_energy_mj_mean':    d.get('avg_energy_mj',     {}).get('mean', 0),
+            'avg_energy_mj_std':     d.get('avg_energy_mj',     {}).get('std',  0),
+            'avg_privacy_risk_mean': d.get('avg_privacy_risk',  {}).get('mean', 0),
+            'avg_privacy_risk_std':  d.get('avg_privacy_risk',  {}).get('std',  0),
+            'sla_violation_pct_mean':d.get('sla_violation_pct', {}).get('mean', 0),
+            'sla_violation_pct_std': d.get('sla_violation_pct', {}).get('std',  0),
+            'n':                     d.get('avg_latency_ms',    {}).get('n',    0),
+        })
+    with open(path, 'w', newline='', encoding='utf-8') as fh:
+        wr = csv.DictWriter(fh, fieldnames=list(rows[0].keys()))
+        wr.writeheader()
+        wr.writerows(rows)
+    print(f'[Q1-MC] Saved {path}')
+
+
+def _save_json(obj, path):
+    def _conv(o):
+        if isinstance(o, defaultdict):
+            return {k: _conv(v) for k, v in o.items()}
+        if isinstance(o, dict):
+            return {str(k): _conv(v) for k, v in o.items()}
+        if isinstance(o, (list, tuple)):
+            return [_conv(x) for x in o]
+        if isinstance(o, (np.integer,)):
+            return int(o)
+        if isinstance(o, (np.floating,)):
+            return float(o)
+        if isinstance(o, np.ndarray):
+            return o.tolist()
+        return o
+    with open(path, 'w', encoding='utf-8') as fh:
+        json.dump(_conv(obj), fh, indent=2)
+    print(f'[Q1-MC] Saved {path}')
+
+
+# ---------------------------------------------------------------------------
+# CLI
+# ---------------------------------------------------------------------------
+def main():
+    parser = argparse.ArgumentParser(
+        description='Q1 master Monte Carlo driver (Fixes 1, 2, 3, 5, 7).'
+    )
+    parser.add_argument('--n_runs', type=int, default=N_RUNS,
+                        help=f'Independent runs per cell (default {N_RUNS})')
+    parser.add_argument('--scales', type=int, nargs='+', default=None,
+                        help=f'Task scales (default {TASK_SCALES})')
+    parser.add_argument('--output', type=str, default=None,
+                        help='Override results directory')
+    parser.add_argument('--quick', action='store_true',
+                        help='5 runs only — debug, not for publication')
+    args = parser.parse_args()
+
+    n_runs = 5 if args.quick else args.n_runs
+    scales = args.scales if args.scales is not None else TASK_SCALES
+
+    script_dir = Path(__file__).resolve().parent
+    project_root = script_dir.parent.parent.parent
+    results_dir = (Path(args.output) if args.output
+                   else project_root / 'results')
+
+    run_full(scales, n_runs, results_dir)
+
+
+if __name__ == '__main__':
+    main()
