@@ -16,6 +16,7 @@ Usage:
 from __future__ import annotations
 
 import random
+import time
 from typing import Dict, List, Optional
 
 import numpy as np
@@ -130,8 +131,10 @@ class OffloadingEnvironment:
         # --- Update node queue loads before scheduling ---
         self._update_arrival_rates(task.timestamp)
 
-        # --- Schedule ---
+        # --- Schedule (Fix C: record wall-clock time for select_node) ---
+        _t0 = time.perf_counter()
         node_id = self.scheduler.select_node(task)
+        scheduling_overhead_ms = (time.perf_counter() - _t0) * 1000.0
         task.assigned_node = node_id
 
         # --- Retrieve node info ---
@@ -139,11 +142,16 @@ class OffloadingEnvironment:
         src_node = self.topology.get_node(task.device_id)
         is_local = (node_id == task.device_id)
 
-        # --- Compute latency ---
+        # --- Compute latency and component breakdown (Fix F) ---
         if is_local:
             latency_s = compute_local_latency(
                 task.cpu_cycles, src_node.hardware.cpu_freq_hz
             )
+            # Component breakdown for local execution
+            lat_tx_s    = 0.0
+            lat_prop_s  = 0.0
+            lat_queue_s = 0.0
+            lat_comp_s  = latency_s
         else:
             uplink_rate = self.topology.get_uplink_rate(task.device_id, node_id)
             prop_delay = self.topology.get_propagation_delay(task.device_id, node_id)
@@ -156,6 +164,11 @@ class OffloadingEnvironment:
                 queue_delay,
                 dst_node.hardware.cpu_freq_hz,
             )
+            # Component breakdown: t_tx + t_prop + t_queue + t_proc
+            lat_tx_s    = task.data_size_bits / max(uplink_rate, 1.0)
+            lat_prop_s  = prop_delay
+            lat_queue_s = queue_delay
+            lat_comp_s  = task.cpu_cycles / max(dst_node.hardware.cpu_freq_hz, 1.0)
 
         # Cap latency at a sensible maximum (prevents infinity propagation)
         latency_s = min(latency_s, 999.0)
@@ -223,6 +236,10 @@ class OffloadingEnvironment:
             'assigned_node':       node_id,
             'node_type':           dst_node.node_type,
             'latency_ms':          latency_s * 1000.0,
+            'latency_tx_ms':       lat_tx_s   * 1000.0,   # Fix F: component
+            'latency_prop_ms':     lat_prop_s  * 1000.0,  # Fix F: component
+            'latency_queue_ms':    lat_queue_s * 1000.0,  # Fix F: component
+            'latency_compute_ms':  lat_comp_s  * 1000.0,  # Fix F: component
             'energy_mj':           energy_j * 1000.0,
             'privacy_risk':        privacy_risk,
             'cost':                cost,
@@ -232,6 +249,7 @@ class OffloadingEnvironment:
             'attack_prob':         task.attack_probability,
             'battery_remaining_j': self._battery_j.get(task.device_id, -1.0),
             'timestamp':           task.timestamp,
+            'scheduling_overhead_ms': scheduling_overhead_ms,  # Fix C: timing
         }
 
     # ------------------------------------------------------------------

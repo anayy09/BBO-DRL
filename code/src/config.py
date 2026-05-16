@@ -94,7 +94,7 @@ MITBIH_RHO:          float = 0.9
 
 
 # ---------------------------------------------------------------------------
-# Statistical testing  (Fix 4)
+# Statistical testing  (Fix 4, Fix E: updated for PSO+DQN)
 # ---------------------------------------------------------------------------
 # Significance tested on four metrics across all baselines vs BBO-DRL.
 # Bonferroni correction: alpha_corrected = 0.05 / (n_baselines * n_metrics)
@@ -103,17 +103,21 @@ STAT_METRICS:        list[str] = [
     'avg_latency_ms', 'avg_energy_mj',
     'avg_privacy_risk', 'sla_violation_pct',
 ]
-STAT_BASELINES:      list[str] = ['PSO', 'ACO', 'HS-HHO', 'BBO-only', 'DQN-only']
-# Bonferroni denominator = len(STAT_BASELINES) * len(STAT_METRICS) = 20
+# Fix A: PSO+DQN added — family size is now 6 × 4 = 24
+STAT_BASELINES:      list[str] = [
+    'PSO+DQN', 'PSO', 'ACO', 'HS-HHO', 'BBO-only', 'DQN-only',
+]
+# Bonferroni denominator = len(STAT_BASELINES) * len(STAT_METRICS) = 24
 
 
 # ---------------------------------------------------------------------------
-# Algorithm registry  (Fix 2: includes ablations)
+# Algorithm registry  (Fix 2: includes ablations; Fix A: adds PSO+DQN)
 # ---------------------------------------------------------------------------
 def get_full_algorithm_registry():
     """
-    Return the complete algorithm registry including BBO-only and DQN-only
-    ablations.  Imported lazily to avoid circular imports at module load.
+    Return the complete algorithm registry including PSO+DQN (Fix A),
+    BBO-only and DQN-only ablations.
+    Imported lazily to avoid circular imports at module load.
     """
     from src.algorithms.aco import ACOScheduler
     from src.algorithms.bbo_drl import BBODRLScheduler
@@ -123,9 +127,11 @@ def get_full_algorithm_registry():
     from src.algorithms.hs_hho import HSHHOScheduler
     from src.algorithms.local_only import LocalOnlyScheduler
     from src.algorithms.pso import PSOScheduler
+    from src.algorithms.pso_dqn import PSODQNScheduler
 
     return {
         'BBO-DRL':    BBODRLScheduler,
+        'PSO+DQN':    PSODQNScheduler,
         'BBO-only':   BBOOnlyScheduler,
         'DQN-only':   DQNOnlyScheduler,
         'PSO':        PSOScheduler,

@@ -88,6 +88,7 @@ plt.rcParams.update({
 # ---------------------------------------------------------------------------
 COLORS: Dict[str, str] = {
     'BBO-DRL':    '#D55E00',   # vermillion — single emphasised series
+    'PSO+DQN':    '#E69F00',   # bright orange — Fix A: control condition
     'BBO-only':   '#CC79A7',   # reddish purple
     'DQN-only':   '#0072B2',   # blue
     'PSO':        '#009E73',   # green
@@ -98,6 +99,7 @@ COLORS: Dict[str, str] = {
 }
 MARKERS: Dict[str, str] = {
     'BBO-DRL':    'o',
+    'PSO+DQN':    'h',         # hexagon — Fix A
     'BBO-only':   's',
     'DQN-only':   'D',
     'PSO':        '^',
@@ -106,9 +108,9 @@ MARKERS: Dict[str, str] = {
     'Local-Only': 'x',
     'Cloud-Only': '+',
 }
-# Default order across every figure
+# Default order across every figure (Fix A: PSO+DQN added)
 DEFAULT_ORDER: List[str] = [
-    'BBO-DRL', 'BBO-only', 'DQN-only',
+    'BBO-DRL', 'PSO+DQN', 'BBO-only', 'DQN-only',
     'PSO', 'ACO', 'HS-HHO',
     'Local-Only', 'Cloud-Only',
 ]
@@ -473,17 +475,58 @@ def fig_epsilon_convergence(trajectory_path: Path, figures_dir: Path):
 # ===========================================================================
 # Figure 7 — weight-scheme ablation (2x2 horizontal bars)
 # ===========================================================================
-def fig_weight_ablation(weight_path: Path, figures_dir: Path):
-    if not weight_path.exists():
-        print(f'[FIG] Skipping weight ablation: {weight_path} not found')
+def _draw_weight_ablation_panel(axes_row, data, modes, labels, palette,
+                                metric_keys, panel_title=None):
+    """Draw one 1×4 row of weight-ablation bars into axes_row."""
+    for col_idx, (ax, (key, label)) in enumerate(zip(axes_row, metric_keys)):
+        mu = [data[m][key]['mean'] for m in modes if m in data]
+        sd = [data[m][key]['std']  for m in modes if m in data]
+        present = [m for m in modes if m in data]
+        y = np.arange(len(present))
+        ax.barh(y, mu, xerr=sd, color=palette[:len(present)],
+                edgecolor=['black' if m == 'nonlinear' else 'none'
+                            for m in present],
+                linewidth=[1.0 if m == 'nonlinear' else 0.0
+                            for m in present],
+                height=0.65, capsize=2,
+                error_kw={'linewidth': 0.6, 'ecolor': '#444444'})
+        ax.set_yticks(y)
+        if col_idx == 0:
+            ax.set_yticklabels([m.capitalize() for m in present], fontsize=7)
+            if panel_title:
+                ax.set_ylabel(panel_title, fontsize=7, labelpad=4)
+        else:
+            ax.set_yticklabels([])
+        ax.invert_yaxis()
+        ax.set_xlabel(label)
+        ax.set_xlim(left=0)
+
+
+def fig_weight_ablation(
+    mixed_path: Path,
+    figures_dir: Path,
+    highci_path: Path | None = None,
+):
+    """
+    Two-panel weight-scheme ablation (Fix B).
+
+    Top row: mixed-CI workload (20 % high, 60 % medium, 20 % low).
+    Bottom row: all-high-CI ICU scenario (Phi in [0.8, 1.0]).
+
+    If highci_path is None or does not exist, only the mixed-CI panel is drawn.
+    """
+    if not mixed_path.exists():
+        print(f'[FIG] Skipping weight ablation: {mixed_path} not found')
         return
-    with open(weight_path, 'r', encoding='utf-8') as fh:
-        data = json.load(fh)
+    with open(mixed_path, 'r', encoding='utf-8') as fh:
+        mixed_data = json.load(fh)
+
+    highci_data = None
+    if highci_path and highci_path.exists():
+        with open(highci_path, 'r', encoding='utf-8') as fh:
+            highci_data = json.load(fh)
 
     modes = ['flat', 'step', 'linear', 'nonlinear']
-    modes = [m for m in modes if m in data]
-    labels = [m.capitalize() for m in modes]
-
     metric_keys = [
         ('avg_latency_ms',    'Latency (ms)'),
         ('avg_energy_mj',     'Energy per task (mJ)'),
@@ -492,27 +535,23 @@ def fig_weight_ablation(weight_path: Path, figures_dir: Path):
     ]
     palette = ['#999999', '#56B4E9', '#009E73', COLORS['BBO-DRL']]
 
-    fig, axes = plt.subplots(2, 2, figsize=(7.0, 3.6),
-                              sharey=True, constrained_layout=True)
-    for idx, (ax, (key, label)) in enumerate(zip(axes.flat, metric_keys)):
-        mu = [data[m][key]['mean'] for m in modes]
-        sd = [data[m][key]['std']  for m in modes]
-        y = np.arange(len(modes))
-        ax.barh(y, mu, xerr=sd, color=palette,
-                edgecolor=['black' if m == 'nonlinear' else 'none'
-                            for m in modes],
-                linewidth=[1.0 if m == 'nonlinear' else 0.0
-                            for m in modes],
-                height=0.65, capsize=2,
-                error_kw={'linewidth': 0.6, 'ecolor': '#444444'})
-        ax.set_yticks(y)
-        if idx % 2 == 0:
-            ax.set_yticklabels(labels, fontsize=7)
-        else:
-            ax.set_yticklabels([])
-        ax.invert_yaxis()
-        ax.set_xlabel(label)
-        ax.set_xlim(left=0)
+    n_rows = 2 if highci_data is not None else 1
+    fig, axes = plt.subplots(n_rows, 4,
+                              figsize=(10.0, 3.0 * n_rows),
+                              sharey='row', constrained_layout=True)
+    if n_rows == 1:
+        axes = axes[np.newaxis, :]   # ensure 2D indexing
+
+    _draw_weight_ablation_panel(
+        axes[0], mixed_data, modes, None, palette, metric_keys,
+        panel_title='Mixed-CI\n(20/60/20%)',
+    )
+    if highci_data is not None:
+        _draw_weight_ablation_panel(
+            axes[1], highci_data, modes, None, palette, metric_keys,
+            panel_title='All-High-CI\n(Φ∈[0.8,1.0])',
+        )
+
     _save(fig, figures_dir, 'fig7_weight_ablation')
 
 
@@ -521,10 +560,13 @@ def fig_weight_ablation(weight_path: Path, figures_dir: Path):
 # ===========================================================================
 def fig_privacy_guard_roc(metrics_path: Path, figures_dir: Path):
     """
-    Single-curve ROC.  Numbers loaded from privacy_guard_metrics.json.
-    The decision rule was a single threshold on H/H_max, so the curve is
-    reconstructed analytically using the same Beta-channel model that
-    generated the operating point.
+    Single-curve ROC loaded directly from privacy_guard_metrics.json (Fix D).
+
+    Uses the roc_fpr / roc_tpr arrays saved by privacy_guard.py and the
+    AUC value computed via sklearn.metrics.roc_auc_score (or trapezoidal
+    fallback).  This eliminates the previous discrepancy where figures_q1.py
+    recomputed AUC from a fixed Beta synthetic model while the text cited the
+    value from the actual simulation.
     """
     if not metrics_path.exists():
         print(f'[FIG] Skipping ROC: {metrics_path} not found')
@@ -532,39 +574,32 @@ def fig_privacy_guard_roc(metrics_path: Path, figures_dir: Path):
     with open(metrics_path, 'r', encoding='utf-8') as fh:
         m = json.load(fh)
 
-    # Sweep thresholds via the same Beta(a,b) channel that produced the
-    # operating point (n_attack / n_benign loaded from the JSON for fidelity).
-    rng = np.random.default_rng(42)
-    n_a = int(m.get('n_attack', 9776))
-    n_b = int(m.get('n_benign',  222))
-    h_attack = rng.beta(3.0, 6.0, size=n_a)
-    h_benign = rng.beta(8.0, 2.0, size=n_b)
-    h = np.concatenate([h_attack, h_benign])
-    y = np.concatenate([np.ones(n_a, int), np.zeros(n_b, int)])
+    # Fix D: load the actual ROC curve from the JSON instead of recomputing
+    fpr_arr = np.array(m.get('roc_fpr', []), dtype=float)
+    tpr_arr = np.array(m.get('roc_tpr', []), dtype=float)
 
-    thr = np.linspace(0.0, 1.0, 201)
-    tpr = np.array([((h < t) & (y == 1)).sum() / max(1, y.sum())
-                     for t in thr])
-    fpr = np.array([((h < t) & (y == 0)).sum() / max(1, (1 - y).sum())
-                     for t in thr])
-    order = np.argsort(fpr)
-    auc = float(np.trapezoid(tpr[order], fpr[order])) \
-        if hasattr(np, 'trapezoid') else float(m.get('AUC', 0.0))
+    if fpr_arr.size == 0:
+        # Fallback: reconstruct from stored operating-point scalars only
+        fpr_arr = np.array([0.0, float(m.get('FPR', 0.05)), 1.0])
+        tpr_arr = np.array([0.0, float(m.get('TPR (recall)', 0.98)), 1.0])
+
+    auc = float(m.get('AUC', 0.0))
 
     fig, ax = plt.subplots(figsize=(3.5, 2.7))
-    ax.plot(fpr[order], tpr[order], color=COLORS['BBO-DRL'],
+    ax.plot(fpr_arr, tpr_arr, color=COLORS['BBO-DRL'],
             linewidth=1.6, label=f'Privacy Guard (AUC = {auc:.3f})')
     ax.plot([0, 1], [0, 1], color='#999999', linestyle='--',
             linewidth=0.6, label='Chance')
-    # Operating point reported in JSON
-    ax.scatter([m['FPR']], [m['TPR (recall)']], color='black',
-               s=35, zorder=6,
-               label=(f'$\\tau=${m["threshold"]:.2f}: '
-                      f'TPR={m["TPR (recall)"]:.2f}, '
-                      f'FPR={m["FPR"]:.2f}'))
+    # Operating point at the chosen threshold
+    op_fpr = float(m.get('FPR', 0.0))
+    op_tpr = float(m.get('TPR (recall)', 0.0))
+    ax.scatter([op_fpr], [op_tpr], color='black', s=35, zorder=6,
+               label=(f'$\\tau={m.get("threshold", 0.55):.2f}$: '
+                      f'TPR={op_tpr:.3f}, FPR={op_fpr:.3f}'))
     ax.set_xlabel('False positive rate')
     ax.set_ylabel('True positive rate')
-    ax.set_xlim(-0.02, 1.02); ax.set_ylim(-0.02, 1.02)
+    ax.set_xlim(-0.02, 1.02)
+    ax.set_ylim(-0.02, 1.02)
     ax.legend(loc='lower right')
     _save(fig, figures_dir, 'fig8_privacy_guard_roc')
 
@@ -668,7 +703,11 @@ def main():
     fig_pareto_energy_latency(summary, fig, ref_scale=args.ref_scale)
     fig_pareto_latency_privacy(summary, fig, ref_scale=args.ref_scale)
     fig_epsilon_convergence(res / 'epsilon_trajectory.json', fig)
-    fig_weight_ablation(res / 'weight_ablation_raw.json', fig)
+    # Fix B: two-panel weight ablation (mixed-CI + all-high-CI)
+    fig_weight_ablation(
+        res / 'weight_ablation_raw.json', fig,
+        highci_path=res / 'weight_ablation_highci_raw.json',
+    )
     fig_privacy_guard_roc(res / 'privacy_guard_metrics.json', fig)
     fig_shap_summary(res / 'shap_feature_importance.json', fig)
     fig_mitbih_trace(res / 'mitbih_trace_raw.json', fig)

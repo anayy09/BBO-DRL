@@ -129,7 +129,10 @@ def _sample_attack_prob(ciciot_events: Optional[list],
 
 def _ci_for_distribution(tier: str, rng: random.Random) -> float:
     """Sample a CI score from the specified CI tier."""
-    if tier == "high":
+    if tier == "all_high":
+        # Fix B: ICU scenario — all tasks arrive with CI uniformly in [0.8, 1.0]
+        return round(rng.uniform(0.8, 1.0), 4)
+    elif tier == "high":
         return round(rng.uniform(0.7, 1.0), 4)
     elif tier == "medium":
         return round(rng.uniform(0.3, 0.7), 4)
@@ -243,6 +246,9 @@ def generate_synthetic_tasks(
             weights=[0.20, 0.60, 0.20],
             k=n,
         )
+    elif ci_distribution == "all_high":
+        # Fix B: ICU scenario — all tasks have CI in [0.8, 1.0]
+        tiers = ["all_high"] * n
     else:
         tiers = [ci_distribution] * n
 

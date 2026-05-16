@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import math
 import random
+import time
 from collections import deque
 from typing import Dict, List, Optional, Tuple
 
@@ -467,6 +468,7 @@ class BBODRLScheduler(BaseScheduler):
 
         # Epsilon trajectory (Fix 7: convergence figure)
         self.epsilon_history: List[float] = []
+        self.dispatch_times_ms: List[float] = []    # Fix C: per-task dispatch timing
 
     # ------------------------------------------------------------------
     # State vector construction
@@ -587,12 +589,15 @@ class BBODRLScheduler(BaseScheduler):
         representative_node = self._idx_to_node[0]
         state = self.get_state(task, representative_node)
 
+        # Fix C: time dispatch decision (DQN top-K + BBO refine), excludes Bellman update
+        t_dispatch_start = time.perf_counter()
         top_k_indices = self._dqn_select_top_k(state)
 
         # --- Step 2: BBO refines within K-node subspace ---
         best_node_id = self._bbo_refine(
             task, top_k_indices, lat_bounds, eng_bounds
         )
+        self.dispatch_times_ms.append((time.perf_counter() - t_dispatch_start) * 1000.0)
 
         # --- Step 3: Compute actual outcome metrics ---
         _, latency_s, energy_j, privacy_risk = self.evaluate_node(

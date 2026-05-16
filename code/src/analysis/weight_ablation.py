@@ -1,16 +1,21 @@
 """
-weight_ablation.py — Fix 6: CI weight function ablation.
+weight_ablation.py — Fix 6 + Fix B: CI weight function ablation.
 
 Compares four CI-to-weight schemes (flat, step, linear, proposed
 non-linear) for BBO-DRL at the primary scale, 30 Monte Carlo trials each.
 
-The weight scheme is switched globally via core.cost_function.set_weight_mode
-so that every per-task cost evaluation in the scheduler, environment, and
-reward shaping uses the same scheme for the run.
+Fix B: also runs all-high-CI ICU scenario (Phi in [0.8, 1.0]) to test
+whether the non-linear scheme separates from alternatives under maximum
+criticality load.  Wilcoxon rank-sum tests (Bonferroni-corrected) between
+non-linear and each other scheme are applied in both scenarios.
 
-Outputs:
+Outputs (mixed-CI workload):
   results/table5_weight_ablation.csv
   results/weight_ablation_raw.json
+
+Outputs (all-high-CI workload, Fix B):
+  results/table6_highci_weights.csv
+  results/weight_ablation_highci_raw.json
 """
 
 from __future__ import annotations
@@ -25,6 +30,7 @@ from pathlib import Path
 from statistics import mean
 
 import numpy as np
+from scipy import stats as scipy_stats
 
 _CODE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(
     os.path.abspath(__file__))))
@@ -67,12 +73,12 @@ def _to_healthcare(t, topo):
     )
 
 
-def _run_once(n_tasks, run_id, topo):
+def _run_once(n_tasks, run_id, topo, ci_distribution='mixed'):
     import random as _r
     seed = GLOBAL_SEED + run_id * 1000 + n_tasks
     _r.seed(seed)
     np.random.seed(seed)
-    raws = generate_synthetic_tasks(n_tasks, 'mixed', seed=seed)
+    raws = generate_synthetic_tasks(n_tasks, ci_distribution, seed=seed)
     tasks = [_to_healthcare(t, topo) for t in raws]
     sched = BBODRLScheduler(topo, seed=seed)
     env = OffloadingEnvironment(topo, sched, n_tasks=n_tasks, seed=seed)
@@ -88,11 +94,59 @@ def _run_once(n_tasks, run_id, topo):
     }
 
 
-def run_ablation(n_tasks: int, n_runs: int, out_dir: Path) -> dict:
+def _wilcoxon_vs_nonlinear(summary: dict) -> dict:
+    """
+    Fix B: Wilcoxon rank-sum tests between non-linear and each other scheme.
+    Bonferroni correction: 3 schemes × 4 metrics = 12 tests.
+    Returns dict[metric][scheme] = {p_raw, p_corrected}.
+    """
+    comparators = ['flat', 'step', 'linear']
+    metric_keys = ['avg_latency_ms', 'avg_energy_mj',
+                   'avg_privacy_risk', 'sla_violation_pct']
+    n_tests = len(comparators) * len(metric_keys)   # 12
+    alpha = 0.05
+
+    if 'nonlinear' not in summary:
+        return {}
+    nl_samples = {k: np.array(summary['nonlinear'][k]['samples'], dtype=float)
+                  for k in metric_keys}
+
+    results = {}
+    for metric in metric_keys:
+        results[metric] = {}
+        for scheme in comparators:
+            if scheme not in summary:
+                continue
+            s2 = np.array(summary[scheme][metric]['samples'], dtype=float)
+            try:
+                _, p_raw = scipy_stats.ranksums(nl_samples[metric], s2)
+            except Exception:
+                p_raw = float('nan')
+            p_corr = min(float(p_raw) * n_tests, 1.0) if not np.isnan(p_raw) else float('nan')
+            results[metric][scheme] = {'p_raw': float(p_raw), 'p_corrected': float(p_corr)}
+    return results
+
+
+def run_ablation(
+    n_tasks: int,
+    n_runs: int,
+    out_dir: Path,
+    ci_distribution: str = 'mixed',
+) -> dict:
+    """
+    Run the weight-scheme ablation.
+
+    Parameters
+    ----------
+    ci_distribution : str
+        'mixed' for standard workload; 'all_high' for Fix B ICU scenario.
+    """
     out_dir.mkdir(parents=True, exist_ok=True)
     topo = build_healthcare_topology(
         n_wearables=N_WEARABLES, n_fog_nodes=N_FOG_NODES, seed=GLOBAL_SEED,
     )
+    label = 'HIGHCI' if ci_distribution == 'all_high' else 'MIXED'
+    print(f'[WEIGHT-AB] ci_distribution={ci_distribution} ({label})')
 
     raw: dict = defaultdict(list)
     for mode in WEIGHT_MODES:
@@ -102,10 +156,9 @@ def run_ablation(n_tasks: int, n_runs: int, out_dir: Path) -> dict:
         if _TQDM:
             it = tqdm(it, desc=f'  {mode:<10s}', leave=False, ncols=70)
         for run_id in it:
-            m = _run_once(n_tasks, run_id, topo)
+            m = _run_once(n_tasks, run_id, topo, ci_distribution=ci_distribution)
             if m is not None:
                 raw[mode].append(m)
-    # Reset to default
     set_weight_mode('nonlinear')
 
     # Aggregate
@@ -125,13 +178,38 @@ def run_ablation(n_tasks: int, n_runs: int, out_dir: Path) -> dict:
         summary[mode] = agg
         csv_rows.append(row)
 
-    with open(out_dir / 'table5_weight_ablation.csv', 'w', newline='',
-              encoding='utf-8') as fh:
-        wr = csv.DictWriter(fh, fieldnames=list(csv_rows[0].keys()))
-        wr.writeheader()
-        wr.writerows(csv_rows)
-    with open(out_dir / 'weight_ablation_raw.json', 'w',
-              encoding='utf-8') as fh:
+    # Wilcoxon tests between non-linear and other schemes
+    wilcoxon_results = _wilcoxon_vs_nonlinear(summary)
+    if wilcoxon_results:
+        print('\n[WEIGHT-AB] Wilcoxon tests (non-linear vs. others), '
+              'Bonferroni-corrected (12 tests):')
+        for metric, comps in wilcoxon_results.items():
+            for scheme, r in comps.items():
+                sig = '*' if r['p_corrected'] < 0.05 else ' '
+                print(f'  {metric} vs {scheme}: p_corr={r["p_corrected"]:.4e}{sig}')
+        # Append Wilcoxon results to csv_rows
+        for mode in WEIGHT_MODES:
+            for row in csv_rows:
+                if row['weight_mode'] == mode:
+                    for metric, comps in wilcoxon_results.items():
+                        if mode in comps:
+                            row[f'{metric}_p_corr_vs_nonlinear'] = \
+                                comps[mode].get('p_corrected', float('nan'))
+
+    # Determine output file names based on ci_distribution
+    if ci_distribution == 'all_high':
+        csv_name = 'table6_highci_weights.csv'
+        json_name = 'weight_ablation_highci_raw.json'
+    else:
+        csv_name = 'table5_weight_ablation.csv'
+        json_name = 'weight_ablation_raw.json'
+
+    if csv_rows:
+        with open(out_dir / csv_name, 'w', newline='', encoding='utf-8') as fh:
+            wr = csv.DictWriter(fh, fieldnames=list(csv_rows[0].keys()))
+            wr.writeheader()
+            wr.writerows(csv_rows)
+    with open(out_dir / json_name, 'w', encoding='utf-8') as fh:
         json.dump(summary, fh, indent=2)
 
     print('\n[WEIGHT-AB] Summary:')
@@ -146,8 +224,7 @@ def run_ablation(n_tasks: int, n_runs: int, out_dir: Path) -> dict:
               f'{s["avg_energy_mj"]["mean"]:>10.4f} '
               f'{s["avg_privacy_risk"]["mean"]:>8.4f} '
               f'{s["sla_violation_pct"]["mean"]:>8.2f}')
-    print(f'\n[WEIGHT-AB] Saved table5_weight_ablation.csv and '
-          f'weight_ablation_raw.json -> {out_dir}')
+    print(f'\n[WEIGHT-AB] Saved {csv_name} and {json_name} -> {out_dir}')
     return summary
 
 

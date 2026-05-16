@@ -12,6 +12,7 @@ from the DQN action-space compression.
 
 from __future__ import annotations
 
+import time
 from typing import List, Optional, Tuple
 
 import numpy as np
@@ -45,6 +46,7 @@ class BBOOnlyScheduler(BaseScheduler):
             n_pop=n_pop, max_iter=max_iter,
             delta0=delta0, seed=seed,
         )
+        self.dispatch_times_ms: List[float] = []    # Fix C: per-task dispatch timing
 
     def select_node(self, task: HealthcareTask) -> int:
         if self._n_nodes == 1:
@@ -64,8 +66,12 @@ class BBOOnlyScheduler(BaseScheduler):
             )
             return cost
 
+        # Fix C: time the full dispatch decision (BBO search only, no DQN/Bellman)
+        t_start = time.perf_counter()
         bounds: List[Tuple[float, float]] = [(0.0, float(N - 1))]
         best_pos, _ = self._bbo.optimize(bbo_cost, bounds, dim=1)
+        self.dispatch_times_ms.append((time.perf_counter() - t_start) * 1000.0)
+
         best_idx = int(round(float(np.clip(best_pos[0], 0.0, N - 1.0))))
         node_id = self._idx_to_node[best_idx]
 

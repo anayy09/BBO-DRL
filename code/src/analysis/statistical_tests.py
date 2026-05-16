@@ -106,7 +106,8 @@ def run_pairwise_tests(summary_path: Path, out_dir: Path,
         wr.writerows(csv_rows)
     print(f'[STAT] Saved {csv_path}')
 
-    # ----- Pretty Table III with p-values -----
+    # ----- Pretty Table III with per-comparison p-values (Fix E) -----
+    # Format: mean ± std (p=X.XXe-Y vs BBO-DRL) per Fix E requirement
     fmt_path = out_dir / 'table3_n1000_with_pvals.csv'
     with open(fmt_path, 'w', newline='', encoding='utf-8') as fh:
         wr = csv.writer(fh)
@@ -125,17 +126,25 @@ def run_pairwise_tests(summary_path: Path, out_dir: Path,
                     row.append(f'{mu:.3f} ± {sd:.3f}')
                 else:
                     pc = results[m].get(alg, {}).get('p_corrected',
-                                                    float('nan'))
-                    star = '*' if (pc < STAT_ALPHA) else ''
-                    row.append(f'{mu:.3f} ± {sd:.3f} '
-                               f'(p={pc:.4f}{star})')
+                                                     float('nan'))
+                    star = '*' if (not np.isnan(pc) and pc < STAT_ALPHA) else ''
+                    if np.isnan(pc):
+                        p_str = 'p=nan'
+                    elif pc < 1e-3:
+                        p_str = f'p={pc:.2e}'   # scientific notation for small p
+                    else:
+                        p_str = f'p={pc:.4f}'
+                    row.append(f'{mu:.3f} ± {sd:.3f} ({p_str}{star})')
             wr.writerow(row)
-        # Footnote
+        # Footnote — Fix E: state family size and correction method explicitly
         wr.writerow([])
         wr.writerow([
-            f'Footnote: p_corrected = Wilcoxon rank-sum p × '
-            f'{n_comparisons} (Bonferroni), alpha={STAT_ALPHA}. '
-            f'* indicates p_corr < {STAT_ALPHA}.',
+            f'Footnote: p_corrected = Wilcoxon rank-sum p × {n_comparisons} '
+            f'(Bonferroni correction, family size = {len(STAT_BASELINES)} baselines '
+            f'× {len(STAT_METRICS)} metrics = {n_comparisons} tests), '
+            f'alpha={STAT_ALPHA}. '
+            f'* indicates p_corr < {STAT_ALPHA}. '
+            f'Baselines: {", ".join(STAT_BASELINES)}.',
         ])
     print(f'[STAT] Saved {fmt_path}')
 

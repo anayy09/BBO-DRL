@@ -41,6 +41,12 @@ from typing import Dict
 
 import numpy as np
 
+try:
+    from sklearn.metrics import roc_auc_score as _sklearn_auc
+    _HAS_SKLEARN = True
+except ImportError:
+    _HAS_SKLEARN = False
+
 _CODE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(
     os.path.abspath(__file__))))
 if _CODE_DIR not in sys.path:
@@ -149,17 +155,27 @@ def run_validation(data_dir: Path, results_dir: Path, figures_dir: Path,
     tpr_curve = np.array(tpr_curve)
     fpr_curve = np.array(fpr_curve)
 
-    # AUC via trapezoidal rule on sorted (FPR, TPR).
-    # numpy >= 2.0 renamed np.trapz -> np.trapezoid; older numpy lacks it.
+    # AUC: prefer sklearn.metrics.roc_auc_score (Fix D: exact computation).
+    # Falls back to trapezoidal rule on the 101-point sweep if sklearn is absent.
     order = np.argsort(fpr_curve)
-    _trapz = getattr(np, 'trapezoid', None) or getattr(np, 'trapz', None)
-    if _trapz is None:
-        x = fpr_curve[order]
-        y = tpr_curve[order]
-        auc = float(np.sum((x[1:] - x[:-1]) * (y[1:] + y[:-1]) / 2.0))
+    if _HAS_SKLEARN:
+        # Use the continuous h_ratio score for an exact AUC — attack label = 1
+        # (h_ratio < threshold triggers detection, so invert: lower h = higher attack score)
+        auc = float(_sklearn_auc(y_true, 1.0 - h_ratios))
+        print(f'   [AUC method: sklearn.metrics.roc_auc_score (exact)]')
     else:
-        auc = float(_trapz(tpr_curve[order], fpr_curve[order]))
+        _trapz = getattr(np, 'trapezoid', None) or getattr(np, 'trapz', None)
+        if _trapz is None:
+            x = fpr_curve[order]
+            y = tpr_curve[order]
+            auc = float(np.sum((x[1:] - x[:-1]) * (y[1:] + y[:-1]) / 2.0))
+        else:
+            auc = float(_trapz(tpr_curve[order], fpr_curve[order]))
+        print(f'   [AUC method: trapezoidal rule on 101-point sweep]')
     metrics['AUC'] = auc
+    # Fix D: save full ROC curve so figures_q1.py uses the same data, not Beta model
+    metrics['roc_fpr'] = fpr_curve[order].tolist()
+    metrics['roc_tpr'] = tpr_curve[order].tolist()
     print(f'   {"AUC":<14s}: {auc:.4f}')
 
     # ----- Plot ROC -----
