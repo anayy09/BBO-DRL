@@ -8,9 +8,9 @@ Design choices (kept across every figure in the set):
 * No plot titles.  LaTeX captions carry the same text, so duplicating
   inside the figure adds clutter.  The only exception is a panel label
   on multi-panel figures.
-* Wong-style color-blind-safe palette.  BBO-DRL is the only series drawn
-  with a filled marker and a thicker stroke; everything else is a thin
-  line or open marker.
+* Wong-style color-blind-safe palette.  On line plots, BBO-DRL is the
+    only filled marker with a thicker stroke; Pareto markers are filled
+    for legibility.
 * Shaded +/-1 SD bands instead of capped error bars on line plots; for
   bars we use thin capped error bars only.
 * No legend inside the plot box when an alternative exists.  Either a
@@ -43,6 +43,8 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
+from matplotlib.lines import Line2D
+from matplotlib.patches import Patch
 
 from src.config import (
     EPSILON_DECAY,
@@ -105,8 +107,8 @@ MARKERS: Dict[str, str] = {
     'PSO':        '^',
     'ACO':        'v',
     'HS-HHO':     'P',
-    'Local-Only': 'x',
-    'Cloud-Only': '+',
+    'Local-Only': 'X',
+    'Cloud-Only': '*',
 }
 # Default order across every figure (Fix A: PSO+DQN added)
 DEFAULT_ORDER: List[str] = [
@@ -125,6 +127,35 @@ def _style_for(alg: str) -> dict:
     return dict(linewidth=0.9, markersize=4.0, zorder=5,
                 markerfacecolor='white',
                 markeredgecolor=COLORS[alg])
+
+
+def _bar_legend_handles(algs: Sequence[str]) -> List[Patch]:
+    """Legend handles that match the horizontal bar styling."""
+    handles: List[Patch] = []
+    for alg in algs:
+        edge = 'black' if alg == 'BBO-DRL' else 'none'
+        lw = 1.0 if alg == 'BBO-DRL' else 0.0
+        handles.append(Patch(facecolor=COLORS[alg], edgecolor=edge,
+                             linewidth=lw, label=alg))
+    return handles
+
+
+def _scatter_legend_handles(algs: Sequence[str]) -> List[Line2D]:
+    """Legend handles for Pareto scatter markers."""
+    handles: List[Line2D] = []
+    for alg in algs:
+        is_bbodrl = (alg == 'BBO-DRL')
+        handles.append(Line2D(
+            [0], [0],
+            marker=MARKERS[alg],
+            linestyle='',
+            markerfacecolor=COLORS[alg],
+            markeredgecolor='#222222' if is_bbodrl else COLORS[alg],
+            markeredgewidth=1.2 if is_bbodrl else 0.9,
+            markersize=7.0 if is_bbodrl else 6.0,
+            label=alg,
+        ))
+    return handles
 
 
 def _save(fig: plt.Figure, fdir: Path, name: str) -> None:
@@ -274,13 +305,19 @@ def fig_metric_bars(summary, figures_dir, ref_scale=PRIMARY_SCALE,
         ('sla_violation_pct', 'SLA violations (%)'),
     ]
 
-    fig, axes = plt.subplots(2, 2, figsize=(7.16, 4.8),
-                              sharey=True, constrained_layout=True)
+    fig, axes = plt.subplots(2, 2, figsize=(7.16, 4.8), sharey=True)
     for idx, (ax, (key, label)) in enumerate(zip(axes.flat, metrics)):
         vals = [summary[ref_scale][a][key]['mean'] for a in algs]
         errs = [summary[ref_scale][a][key]['std']  for a in algs]
         _hbar_panel(ax, algs, vals, errs, label,
                     show_yticklabels=(idx % 2 == 0))
+    handles = _bar_legend_handles(algs)
+    ncol = 5 if len(handles) >= 9 else 4 if len(handles) >= 7 else len(handles)
+    fig.legend(handles=handles, loc='lower center',
+               bbox_to_anchor=(0.5, 0.02), ncol=ncol,
+               columnspacing=0.9, handletextpad=0.4,
+               handlelength=1.4)
+    fig.tight_layout(rect=[0, 0.08, 1, 1])
     _save(fig, figures_dir, 'fig3_metric_bars')
 
 
@@ -301,33 +338,11 @@ def _pareto_mask(xs: np.ndarray, ys: np.ndarray) -> np.ndarray:
     return keep
 
 
-def _detect_cluster(names, xs, ys, x_tol=2.0, y_tol=0.02):
-    """
-    Return the set of names whose (x, y) sits within (x_tol, y_tol) of at
-    least one other point.  Used to draw a single leader-line annotation
-    on top of an otherwise indistinguishable visual cluster (PSO ~=
-    HS-HHO ~= BBO-only in our data).
-    """
-    cluster = set()
-    n = len(names)
-    for i in range(n):
-        for j in range(n):
-            if i == j:
-                continue
-            if abs(xs[i] - xs[j]) <= x_tol and abs(ys[i] - ys[j]) <= y_tol:
-                cluster.add(names[i])
-                cluster.add(names[j])
-    return cluster
-
-
 def _fig_pareto(summary, ref_scale, x_key, y_key, x_label, y_label,
-                 out_name, figures_dir, algs,
-                 cluster_label_offset=(0.18, 0.18)):
+                 out_name, figures_dir, algs):
     """
-    Pareto scatter with the legend pushed *outside* the plot box on the
-    right and a single leader-line annotation for any visual cluster of
-    overlapping algorithms.  This replaces the `loc='best'` legend that
-    landed on top of the data in the previous version.
+    Pareto scatter with a compact legend strip below the plot.  Markers
+    are filled for visibility and use heavier glyphs for baseline nodes.
     """
     algs = [a for a in algs if a in summary.get(ref_scale, {})]
     xs, ys, names = [], [], []
@@ -340,93 +355,70 @@ def _fig_pareto(summary, ref_scale, x_key, y_key, x_label, y_label,
         xs.append(x); ys.append(y); names.append(alg)
     xs_a = np.array(xs); ys_a = np.array(ys)
 
-    # Wider canvas so the external legend has room
-    fig, ax = plt.subplots(figsize=(5.0, 3.0))
+    fig, ax = plt.subplots(figsize=(5.0, 3.2))
 
     for i, alg in enumerate(names):
         is_bbodrl = (alg == 'BBO-DRL')
-        ax.scatter(xs_a[i], ys_a[i],
-                   color=COLORS[alg] if is_bbodrl else 'white',
-                   marker=MARKERS[alg],
-                   s=85 if is_bbodrl else 55,
-                   edgecolors=COLORS[alg],
-                   linewidths=1.4 if is_bbodrl else 1.1,
-                   zorder=8 if is_bbodrl else 6,
-                   label=alg)
+        ax.scatter(
+            xs_a[i], ys_a[i],
+            facecolors=COLORS[alg],
+            edgecolors='#222222' if is_bbodrl else COLORS[alg],
+            marker=MARKERS[alg],
+            s=115 if is_bbodrl else 75,
+            linewidths=1.2 if is_bbodrl else 0.9,
+            zorder=9 if is_bbodrl else 7,
+        )
 
     # Pareto front (minimisation of both axes)
+    pareto_handle = None
     if len(xs_a) >= 3:
         mask = _pareto_mask(xs_a, ys_a)
         order = np.argsort(xs_a[mask])
-        ax.plot(xs_a[mask][order], ys_a[mask][order], color='#666666',
-                linewidth=0.8, linestyle='--', alpha=0.7, zorder=2,
-                label='Pareto front')
+        (pareto_handle,) = ax.plot(
+            xs_a[mask][order], ys_a[mask][order],
+            color='#666666', linewidth=0.8, linestyle='--', alpha=0.7,
+            zorder=2, label='Pareto front'
+        )
 
     # Generous padding so Local-Only / Cloud-Only markers do not sit on
-    # the spine, and so the cluster annotation has somewhere to go
+    # the spine.
     x_pad = (xs_a.max() - xs_a.min()) * 0.10
     y_pad = (ys_a.max() - ys_a.min()) * 0.10
     ax.set_xlim(xs_a.min() - x_pad, xs_a.max() + x_pad)
     ax.set_ylim(ys_a.min() - y_pad, ys_a.max() + y_pad)
 
-    # Annotate the visual cluster with a single leader-line label
-    x_tol = (xs_a.max() - xs_a.min()) * 0.04
-    y_tol = (ys_a.max() - ys_a.min()) * 0.04
-    cluster = _detect_cluster(names, xs_a.tolist(), ys_a.tolist(),
-                              x_tol=x_tol, y_tol=y_tol)
-    cluster -= {'BBO-DRL'}                  # never hide BBO-DRL inside a group
-    if len(cluster) >= 2:
-        cx = float(np.mean([xs_a[i] for i, n in enumerate(names) if n in cluster]))
-        cy = float(np.mean([ys_a[i] for i, n in enumerate(names) if n in cluster]))
-        # Label position: nudge into a quadrant that has empty space
-        dx, dy = cluster_label_offset
-        label_xy = (cx + dx * (xs_a.max() - xs_a.min()),
-                    cy + dy * (ys_a.max() - ys_a.min()))
-        ax.annotate(' ≈ '.join(sorted(cluster)),
-                    xy=(cx, cy), xytext=label_xy,
-                    fontsize=6.5, ha='left', va='center',
-                    arrowprops=dict(arrowstyle='-', color='#666666',
-                                    linewidth=0.6,
-                                    shrinkA=0, shrinkB=3),
-                    bbox=dict(boxstyle='round,pad=0.25',
-                              facecolor='white', edgecolor='#bbbbbb',
-                              linewidth=0.4))
-
-    ax.set_xlabel(x_label)
-    ax.set_ylabel(y_label)
-    # Legend OUTSIDE the axes on the right.  Proper marker handles
-    # (handlelength=1.0) so each row shows the actual marker shape and
-    # colour.
-    ax.legend(loc='center left', bbox_to_anchor=(1.02, 0.5),
-              handlelength=1.0, handletextpad=0.4,
-              borderaxespad=0.0, frameon=False)
-    fig.subplots_adjust(right=0.74)
+    ax.set_xlabel(x_label, labelpad=2)
+    ax.set_ylabel(y_label, labelpad=2)
+    handles = _scatter_legend_handles(names)
+    if pareto_handle is not None:
+        handles.append(pareto_handle)
+    ncol = 5 if len(handles) >= 9 else 4 if len(handles) >= 7 else len(handles)
+    ax.legend(handles=handles, loc='lower center',
+              bbox_to_anchor=(0.5, -0.55), ncol=ncol,
+              columnspacing=0.9, handletextpad=0.4,
+              handlelength=1.2, frameon=False)
+    fig.subplots_adjust(bottom=0.48)
     _save(fig, figures_dir, out_name)
 
 
 def fig_pareto_energy_latency(summary, figures_dir, ref_scale=PRIMARY_SCALE):
-    # Cluster (PSO/HS-HHO/BBO-only) sits at lower-left; nudge label NE
     _fig_pareto(summary, ref_scale,
                 x_key='avg_energy_mj', y_key='avg_latency_ms',
                 x_label='Average energy per task (mJ)',
                 y_label='Average latency (ms)',
                 out_name='fig4_pareto_energy_latency',
                 figures_dir=figures_dir,
-                algs=DEFAULT_ORDER,
-                cluster_label_offset=(0.05, 0.18))
+                algs=DEFAULT_ORDER)
 
 
 def fig_pareto_latency_privacy(summary, figures_dir, ref_scale=PRIMARY_SCALE):
-    # Cluster sits middle-left; ACO/Cloud-Only are above and to the right,
-    # so push the cluster label DOWN-RIGHT into the empty quadrant.
     _fig_pareto(summary, ref_scale,
                 x_key='avg_latency_ms', y_key='avg_privacy_risk',
                 x_label='Average latency (ms)',
                 y_label='Average privacy risk',
                 out_name='fig5_pareto_latency_privacy',
                 figures_dir=figures_dir,
-                algs=DEFAULT_ORDER,
-                cluster_label_offset=(0.18, -0.10))
+                algs=DEFAULT_ORDER)
 
 
 # ===========================================================================
@@ -536,9 +528,11 @@ def fig_weight_ablation(
     palette = ['#999999', '#56B4E9', '#009E73', COLORS['BBO-DRL']]
 
     n_rows = 2 if highci_data is not None else 1
-    fig, axes = plt.subplots(n_rows, 4,
-                              figsize=(10.0, 3.0 * n_rows),
-                              sharey='row', constrained_layout=True)
+    fig, axes = plt.subplots(
+        n_rows, 4,
+        figsize=(10.0, 3.0 * n_rows),
+        sharey='row',
+    )
     if n_rows == 1:
         axes = axes[np.newaxis, :]   # ensure 2D indexing
 
@@ -551,6 +545,27 @@ def fig_weight_ablation(
             axes[1], highci_data, modes, None, palette, metric_keys,
             panel_title='All-High-CI\n(Φ∈[0.8,1.0])',
         )
+
+    scheme_labels = {
+        'flat': 'Flat',
+        'step': 'Step',
+        'linear': 'Linear',
+        'nonlinear': 'Non-linear',
+    }
+    scheme_handles = [
+        Patch(
+            facecolor=palette[i],
+            edgecolor='black' if modes[i] == 'nonlinear' else 'none',
+            linewidth=1.0 if modes[i] == 'nonlinear' else 0.0,
+            label=scheme_labels[modes[i]],
+        )
+        for i in range(len(modes))
+    ]
+    fig.legend(handles=scheme_handles, loc='lower center',
+               bbox_to_anchor=(0.5, 0.02), ncol=4,
+               columnspacing=0.9, handletextpad=0.4,
+               handlelength=1.4)
+    fig.tight_layout(rect=[0, 0.08, 1, 1])
 
     _save(fig, figures_dir, 'fig7_weight_ablation')
 
@@ -666,13 +681,19 @@ def fig_mitbih_trace(trace_path: Path, figures_dir: Path,
         ('avg_privacy_risk',  'Privacy risk'),
         ('sla_violation_pct', 'SLA violations (%)'),
     ]
-    fig, axes = plt.subplots(2, 2, figsize=(7.16, 4.8),
-                              sharey=True, constrained_layout=True)
+    fig, axes = plt.subplots(2, 2, figsize=(7.16, 4.8), sharey=True)
     for idx, (ax, (key, label)) in enumerate(zip(axes.flat, metrics)):
         vals = [d[a][key]['mean'] for a in algs]
         errs = [d[a][key]['std']  for a in algs]
         _hbar_panel(ax, algs, vals, errs, label,
                     show_yticklabels=(idx % 2 == 0))
+    handles = _bar_legend_handles(algs)
+    ncol = 5 if len(handles) >= 9 else 4 if len(handles) >= 7 else len(handles)
+    fig.legend(handles=handles, loc='lower center',
+               bbox_to_anchor=(0.5, 0.02), ncol=ncol,
+               columnspacing=0.9, handletextpad=0.4,
+               handlelength=1.4)
+    fig.tight_layout(rect=[0, 0.08, 1, 1])
     _save(fig, figures_dir, 'fig10_mitbih_trace')
 
 
