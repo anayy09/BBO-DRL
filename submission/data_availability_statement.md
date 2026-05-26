@@ -1,5 +1,13 @@
 # Data and Code Availability Statement
 
+## Code Availability Statement
+
+The full BBO-DRL implementation — including the simulation framework, all nine schedulers (BBO-DRL, BBO-only, DQN-only, PSO, PSO+DQN, ACO, HS-HHO, Local-Only, Cloud-Only), the Monte Carlo orchestrator, the Privacy Guard, the SHAP-explained CI module, configuration files, and per-run JSON/CSV outputs reproducing every figure and table in this paper — is publicly released under an open-source license at:
+
+**Repository:** https://github.com/anayy09/BBO-DRL
+
+A reproducibility script (`code/run_q1_pipeline.py`) re-runs the full Monte Carlo evaluation end-to-end from the four open datasets listed below.
+
 ## Data Availability Statement
 
 All datasets used in this study are publicly accessible through open-access repositories and can be obtained without institutional affiliation or data access agreements. No proprietary, restricted-access, or patient-identifiable clinical data were used at any stage of this research.
