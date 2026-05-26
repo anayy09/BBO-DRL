@@ -1,6 +1,6 @@
 # BBO-DRL: Bio-Inspired Adaptive Task Offloading for IoT-Edge-Cloud Healthcare Networks
 
-A hybrid Bombardier Beetle Optimizer / Deep Q-Network scheduling system for privacy-aware, Criticality-Index-adaptive task offloading in IoMT deployments. Submitted to IEEE Journal of Biomedical and Health Informatics.
+A hybrid Bombardier Beetle Optimizer / Deep Q-Network scheduling system for privacy-aware, Criticality-Index-adaptive task offloading in IoMT deployments.
 
 ---
 
@@ -24,21 +24,6 @@ Bio-Inspired Adaptive Task Offloading System/
 ├── configs/
 │   └── simulation_config.yaml  # Hardware parameters, topology, MC protocol
 ├── data/                       # (not committed) — place downloaded datasets here
-├── docs/
-│   ├── Patent.md               # Full provisional patent text
-│   ├── Plan.md                 # Journal publication roadmap
-│   ├── Fix.md                  # Round-1 revision log (implemented)
-│   └── Fix2.md                 # Round-2 revision log (in progress)
-├── figures/                    # Architecture diagrams referenced in patent
-├── latex/
-│   ├── manuscript.tex          # J-BHI submission source
-│   └── figures/                # Publication-quality PDFs and PNGs (fig1–fig10)
-├── results/                    # JSON and CSV outputs from completed runs
-├── submission/
-│   ├── cover_letter.md
-│   ├── complexity_analysis.md
-│   ├── data_availability_statement.md
-│   └── reviewer_anticipation.md
 └── README.md
 ```
 
@@ -180,46 +165,6 @@ python code/regen_figures.py
 
 ---
 
-## Publication Figures
-
-All figures are in `latex/figures/` as PDF + PNG pairs.
-
-| File | Figure | Description |
-|------|--------|-------------|
-| `fig1_latency_vs_scale` | Fig. 1 | Mean latency vs. task scale (N = 100–5,000) |
-| `fig2_energy_sla_vs_scale` | Fig. 2 | Energy per task and SLA violation rate vs. scale |
-| `fig3_metric_bars` | Fig. 3 | Per-metric bar comparison at N = 1,000 |
-| `fig4_pareto_energy_latency` | Fig. 4 | Pareto frontier: energy vs. latency |
-| `fig5_pareto_latency_privacy` | Fig. 5 | Pareto frontier: latency vs. privacy risk |
-| `fig6_epsilon_convergence` | Fig. 6 | ε-decay trajectory (30-run mean ± 1 SD) |
-| `fig7_weight_ablation` | Fig. 7 | CI weight scheme ablation (mixed-CI panel; all-high-CI panel pending) |
-| `fig8_privacy_guard_roc` | Fig. 8 | Privacy Guard ROC curve on MedSec-25 |
-| `fig9_shap_summary` | Fig. 9 | Mean |SHAP| values for the CI module |
-| `fig10_mitbih_trace` | Fig. 10 | MIT-BIH real-trace results |
-
----
-
-## Completed Result Files
-
-The following result files are committed and reproducible:
-
-| File | Contents |
-|------|----------|
-| `results/mc_full_summary.json` | Per-scale per-algorithm statistics from 30-run MC |
-| `results/mc_full_results.json` | Raw per-run outputs |
-| `results/table3_n1000.csv` | Headline comparison table at N = 1,000 |
-| `results/table3_n1000_with_pvals.csv` | Table III with Bonferroni-corrected p-values |
-| `results/table5_weight_ablation.csv` | CI weight scheme ablation (mixed-CI) |
-| `results/table5_mitbih_trace.csv` | MIT-BIH real-trace comparison |
-| `results/privacy_guard_metrics.json` | AUC, TPR, FPR, F1 at τ = 0.55 |
-| `results/shap_feature_importance.json` | SHAP mean |value| per physiological feature |
-| `results/epsilon_trajectory.json` | ε-decay trajectory across 30 runs |
-| `results/mitbih_trace_raw.json` | Raw per-run MIT-BIH results |
-
-Pending (require new runs): `table6_highci_weights.csv`, `scheduling_overhead_summary.csv`, `latency_decomposition.csv`, `dqn_only_routing_summary.json`.
-
----
-
 ## Recommended Execution Order
 
 1. `pip install -r code/requirements.txt`
@@ -230,29 +175,9 @@ Pending (require new runs): `table6_highci_weights.csv`, `scheduling_overhead_su
 
 ---
 
-## Citing This Work
-
-**Manuscript (under review):**
-```bibtex
-@article{bbodrl2026,
-  title   = {BBO-DRL: A Hybrid Bombardier Beetle Optimizer with Deep Reinforcement
-             Learning for Adaptive Task Offloading in IoT-Edge-Cloud Healthcare Networks},
-  author  = {Sinha, Anay},
-  journal = {IEEE Journal of Biomedical and Health Informatics},
-  year    = {2026},
-  note    = {Under review}
-}
-```
-
 **Bombardier Beetle Optimizer:**
 ```
 arXiv:2510.17005 (Oct 2025) — original algorithm and CEC 2017 benchmark results
-```
-
-**Provisional patent (system architecture):**
-```
-Bio-Inspired Adaptive Task Offloading System for Energy-Efficient IoT-Edge-Cloud
-Healthcare Continuum. U.S. Provisional Patent Application, 2024.
 ```
 
 ---
