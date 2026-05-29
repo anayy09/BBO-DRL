@@ -1,13 +1,13 @@
 """
 latency_decomposition.py — Fix F (Fix2.md): latency component breakdown.
 
-Decomposes mean end-to-end latency at N=1000 for BBO-DRL and PSO into
+Decomposes mean end-to-end latency at N=1000 for DQN-ES and PSO into
 three components:
   (1) transmission latency  t_tx   = D_i / R_{i,j}
   (2) queuing delay         t_queue (M/M/1 sojourn)
   (3) compute at destination t_proc = C_i / f_j
 
-Clarifies whether BBO-DRL's latency penalty over PSO comes from routing to
+Clarifies whether DQN-ES's latency penalty over PSO comes from routing to
 a slower node (compute component) or a more distant node (transmission).
 
 Outputs
@@ -47,7 +47,7 @@ from src.simulation.environment import OffloadingEnvironment
 from src.simulation.topology import build_healthcare_topology
 
 # Algorithms for decomposition (the two main comparators per Fix F spec)
-DECOMP_ALGORITHMS = ['BBO-DRL', 'PSO', 'PSO+DQN']
+DECOMP_ALGORITHMS = ['DQN-ES', 'PSO', 'PSO']
 
 
 def _run_cell(payload: tuple) -> tuple:

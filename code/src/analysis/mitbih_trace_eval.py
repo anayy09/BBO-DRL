@@ -253,7 +253,7 @@ def run_mitbih_trace(
     print('  ' + '-' * (len(hdr) - 2))
     for alg in alg_names:
         s = summary[alg]
-        tag = '*' if alg == 'BBO-DRL' else ' '
+        tag = '*' if alg == 'DQN-ES' else ' '
         print(f'  {alg+tag:<12s} '
               f'{s["avg_latency_ms"]["mean"]:>10.2f} '
               f'{s["avg_energy_mj"]["mean"]:>10.4f} '

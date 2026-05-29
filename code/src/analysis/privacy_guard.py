@@ -102,9 +102,13 @@ def _entropy_ratio_from_flow(is_attack: bool, severity: float,
     return float(max(0.0, min(1.0, eta)))
 
 
-def run_validation(data_dir: Path, results_dir: Path, figures_dir: Path,
+def run_validation(data_dir: Path, out_dir: Path,
+                   fig_dir: Path | None = None,
                    threshold: float = PRIVACY_ENTROPY_THRESHOLD,
+                   workers: int | None = None,
                    seed: int = 42) -> Dict:
+    results_dir = out_dir
+    figures_dir = fig_dir if fig_dir else out_dir
     results_dir.mkdir(parents=True, exist_ok=True)
     figures_dir.mkdir(parents=True, exist_ok=True)
 

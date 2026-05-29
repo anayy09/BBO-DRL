@@ -1,7 +1,7 @@
 """
 statistical_tests.py — Fix 4.
 
-Pairwise Wilcoxon rank-sum (Mann-Whitney U) tests between BBO-DRL and each
+Pairwise Wilcoxon rank-sum (Mann-Whitney U) tests between DQN-ES and each
 baseline on the four headline metrics, using the 30 per-run samples from
 mc_full_summary.json (at PRIMARY_SCALE).  Applies Bonferroni correction
 across the (n_baselines × n_metrics) family of comparisons.
@@ -35,11 +35,22 @@ from src.config import (
 )
 
 
+def _run_test_stats(payload):
+    m, b, s1, s2 = payload
+    if len(s1) == 0 or len(s2) == 0: return m, b, float('nan')
+    try:
+        from scipy import stats
+        _, p_raw = stats.ranksums(s1, s2)
+        return m, b, float(p_raw)
+    except Exception:
+        return m, b, float('nan')
+
+
 def run_pairwise_tests(summary_path: Path, out_dir: Path,
-                       scale: int = PRIMARY_SCALE) -> dict:
+                       scale: int = PRIMARY_SCALE, workers: int | None = None) -> dict:
     """
     Run Wilcoxon rank-sum tests for each (baseline, metric) pair against
-    BBO-DRL, then apply Bonferroni correction.
+    DQN-ES, then apply Bonferroni correction.
 
     Returns
     -------
@@ -53,8 +64,8 @@ def run_pairwise_tests(summary_path: Path, out_dir: Path,
         raise KeyError(f'Scale {scale} not in summary file.')
 
     cell = summary[scale_key]
-    if 'BBO-DRL' not in cell:
-        raise KeyError('BBO-DRL not present in summary file.')
+    if 'DQN-ES' not in cell:
+        raise KeyError('DQN-ES not present in summary file.')
 
     n_comparisons = len(STAT_BASELINES) * len(STAT_METRICS)
     alpha_corr = STAT_ALPHA / n_comparisons
@@ -62,38 +73,35 @@ def run_pairwise_tests(summary_path: Path, out_dir: Path,
     results = {}
     csv_rows = []
 
+    import concurrent.futures
+    payloads = []
     for metric in STAT_METRICS:
-        bbo_samples = np.array(
-            cell['BBO-DRL'][metric]['samples'], dtype=float,
-        )
         results[metric] = {}
+        if 'DQN-ES' not in cell or metric not in cell['DQN-ES']:
+            continue
+        bbo_samples = np.array(cell['DQN-ES'][metric]['samples'], dtype=float)
         for base in STAT_BASELINES:
-            if base not in cell:
+            if base not in cell or metric not in cell[base]:
                 continue
-            base_samples = np.array(
-                cell[base][metric]['samples'], dtype=float,
-            )
-            if len(base_samples) == 0 or len(bbo_samples) == 0:
-                p_raw = float('nan')
-            else:
-                try:
-                    _, p_raw = stats.ranksums(bbo_samples, base_samples)
-                except Exception:
-                    p_raw = float('nan')
-            p_corr = min(p_raw * n_comparisons, 1.0) \
-                if not np.isnan(p_raw) else float('nan')
+            base_samples = np.array(cell[base][metric]['samples'], dtype=float)
+            payloads.append((metric, base, bbo_samples, base_samples))
+    
+    if workers is None:
+        workers = max(1, (os.cpu_count() or 2) - 1)
+        
+    with concurrent.futures.ProcessPoolExecutor(max_workers=workers) as executor:
+        for m, b, p_raw in executor.map(_run_test_stats, payloads):
+            p_corr = min(p_raw * n_comparisons, 1.0) if not np.isnan(p_raw) else float('nan')
             sig = (not np.isnan(p_corr)) and (p_corr < STAT_ALPHA)
-            results[metric][base] = {
-                'p_raw':       float(p_raw),
+            results[m][b] = {
+                'p_raw': float(p_raw),
                 'p_corrected': float(p_corr),
                 'significant': bool(sig),
-                'n_bbo':       int(len(bbo_samples)),
-                'n_baseline':  int(len(base_samples)),
             }
             csv_rows.append({
-                'metric':      metric,
-                'baseline':    base,
-                'p_raw':       p_raw,
+                'metric': m,
+                'baseline': b,
+                'p_raw': p_raw,
                 'p_corrected': p_corr,
                 'significant_after_bonferroni': sig,
             })
@@ -107,22 +115,22 @@ def run_pairwise_tests(summary_path: Path, out_dir: Path,
     print(f'[STAT] Saved {csv_path}')
 
     # ----- Pretty Table III with per-comparison p-values (Fix E) -----
-    # Format: mean ± std (p=X.XXe-Y vs BBO-DRL) per Fix E requirement
+    # Format: mean ± std (p=X.XXe-Y vs DQN-ES) per Fix E requirement
     fmt_path = out_dir / 'table3_n1000_with_pvals.csv'
     with open(fmt_path, 'w', newline='', encoding='utf-8') as fh:
         wr = csv.writer(fh)
         wr.writerow([
             'algorithm',
-            *[f'{m}_mean±std (p_corr vs BBO-DRL)' for m in STAT_METRICS],
+            *[f'{m}_mean±std (p_corr vs DQN-ES)' for m in STAT_METRICS],
         ])
-        for alg in ['BBO-DRL'] + STAT_BASELINES:
+        for alg in ['DQN-ES'] + STAT_BASELINES:
             if alg not in cell:
                 continue
             row = [alg]
             for m in STAT_METRICS:
                 d = cell[alg][m]
                 mu, sd = d['mean'], d['std']
-                if alg == 'BBO-DRL':
+                if alg == 'DQN-ES':
                     row.append(f'{mu:.3f} ± {sd:.3f}')
                 else:
                     pc = results[m].get(alg, {}).get('p_corrected',
@@ -149,7 +157,7 @@ def run_pairwise_tests(summary_path: Path, out_dir: Path,
     print(f'[STAT] Saved {fmt_path}')
 
     # Console digest
-    print('\n[STAT] Bonferroni-corrected pairwise tests vs BBO-DRL '
+    print('\n[STAT] Bonferroni-corrected pairwise tests vs DQN-ES '
           f'(scale={scale}, alpha={STAT_ALPHA}, '
           f'family size={n_comparisons}):')
     for m in STAT_METRICS:

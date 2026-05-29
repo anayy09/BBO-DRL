@@ -1,17 +1,17 @@
 """
 scheduling_overhead.py — Fix C (Fix2.md): wall-clock scheduling latency.
 
-Instruments the per-task scheduling decision for BBO-DRL, PSO+DQN, and
-BBO-only at N=1000 over 30 Monte Carlo runs.
+Instruments the per-task scheduling decision for DQN-ES, PSO+DQN, and
+ES-only at N=1000 over 30 Monte Carlo runs.
 
 Timing definition
 -----------------
-For BBO-DRL and PSO+DQN: from state observation (line 1 of Algorithm 1) to
+For DQN-ES and PSO+DQN: from state observation (line 1 of Algorithm 1) to
 dispatch decision (line 15 = just after the inner-search returns the node_id),
 EXCLUDING the Bellman update (lines 16–18).  This is captured by
 dispatch_times_ms in each scheduler.
 
-For BBO-only: dispatch_times_ms captures the full BBO search call (no DQN or
+For ES-only: dispatch_times_ms captures the full BBO search call (no DQN or
 Bellman update).
 
 Note: the environment also records `scheduling_overhead_ms` which covers the
@@ -60,7 +60,7 @@ from src.simulation.environment import OffloadingEnvironment
 from src.simulation.topology import build_healthcare_topology
 
 # Algorithms timed per Fix C spec
-TIMED_ALGORITHMS = ['BBO-DRL', 'PSO+DQN', 'BBO-only']
+TIMED_ALGORITHMS = ['DQN-ES', 'ES-only']
 
 
 # ---------------------------------------------------------------------------

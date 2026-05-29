@@ -13,7 +13,7 @@ Outputs (all PDF, IEEE single/double column):
   latex/figures/fig_privacy_comparison.pdf     — grouped bar chart, privacy risk
   latex/figures/fig_sla_violation_rate.pdf     — line chart, SLA violation %
   latex/figures/fig_pareto_frontier.pdf        — scatter Pareto: energy vs latency
-  latex/figures/fig_convergence_bbo.pdf        — BBO-DRL convergence (cost reduction)
+  latex/figures/fig_convergence_bbo.pdf        — DQN-ES convergence (cost reduction)
   latex/figures/fig_performance_bar.pdf        — overall summary bar chart
   results/mc_results.json                      — full raw results
   results/mc_summary.json                      — mean ± std per algorithm per scale
@@ -54,7 +54,7 @@ except ImportError:
 # ---------------------------------------------------------------------------
 # Project imports
 # ---------------------------------------------------------------------------
-from src.algorithms.bbo_drl import BBODRLScheduler
+from src.algorithms.dqn_es import DQNESScheduler
 from src.algorithms.pso import PSOScheduler
 from src.algorithms.aco import ACOScheduler
 from src.algorithms.hs_hho import HSHHOScheduler
@@ -85,7 +85,7 @@ plt.rcParams.update({
 # Algorithm registry
 # ---------------------------------------------------------------------------
 ALGORITHM_REGISTRY = {
-    'BBO-DRL':    BBODRLScheduler,
+    'DQN-ES':    DQNESScheduler,
     'PSO':        PSOScheduler,
     'ACO':        ACOScheduler,
     'HS-HHO':     HSHHOScheduler,
@@ -95,7 +95,7 @@ ALGORITHM_REGISTRY = {
 
 # Colorblind-friendly palette
 COLORS = {
-    'BBO-DRL':    '#D62728',
+    'DQN-ES':    '#D62728',
     'PSO':        '#1F77B4',
     'ACO':        '#2CA02C',
     'HS-HHO':     '#FF7F0E',
@@ -103,7 +103,7 @@ COLORS = {
     'Cloud-Only': '#8C564B',
 }
 MARKERS = {
-    'BBO-DRL':    'o',
+    'DQN-ES':    'o',
     'PSO':        's',
     'ACO':        '^',
     'HS-HHO':     'D',
@@ -111,7 +111,7 @@ MARKERS = {
     'Cloud-Only': 'P',
 }
 LINE_STYLES = {
-    'BBO-DRL':    '-',
+    'DQN-ES':    '-',
     'PSO':        '--',
     'ACO':        '-.',
     'HS-HHO':     ':',
@@ -403,14 +403,14 @@ def _fig_line(mc_summary, task_scales, alg_names,
         means_a = np.array(means)
         stds_a  = np.array(stds)
 
-        lw = 1.4 if alg == 'BBO-DRL' else 0.9
-        zorder = 5 if alg == 'BBO-DRL' else 2
+        lw = 1.4 if alg == 'DQN-ES' else 0.9
+        zorder = 5 if alg == 'DQN-ES' else 2
 
         ax.plot(xs_a, means_a,
                 color=COLORS[alg], marker=MARKERS[alg],
                 linestyle=LINE_STYLES[alg],
                 linewidth=lw, markersize=4,
-                label=f'{alg} (Proposed)' if alg == 'BBO-DRL' else alg,
+                label=f'{alg} (Proposed)' if alg == 'DQN-ES' else alg,
                 zorder=zorder)
         ax.fill_between(xs_a,
                         means_a - stds_a, means_a + stds_a,
@@ -455,14 +455,14 @@ def _fig_privacy_bar(mc_summary, ref_scale, alg_names, figures_dir: Path):
                    color=bar_colors, edgecolor='black', linewidth=0.5,
                    height=0.6, capsize=2, error_kw={'linewidth': 0.7})
 
-    # Highlight BBO-DRL with bold border
-    bbo_idx = alg_names.index('BBO-DRL')
+    # Highlight DQN-ES with bold border
+    bbo_idx = alg_names.index('DQN-ES')
     bars[bbo_idx].set_edgecolor('black')
     bars[bbo_idx].set_linewidth(1.2)
 
     ax.set_yticks(y_pos)
     ax.set_yticklabels(
-        [f'{a} (Proposed)' if a == 'BBO-DRL' else a for a in alg_names],
+        [f'{a} (Proposed)' if a == 'DQN-ES' else a for a in alg_names],
         fontsize=7
     )
     ax.set_xlabel('Avg Privacy Risk', fontsize=8)
@@ -498,7 +498,7 @@ def _fig_pareto(mc_summary, ref_scale, alg_names, figures_dir: Path):
         ax.scatter(pts_e[i], pts_l[i],
                    color=COLORS[alg], marker=MARKERS[alg],
                    s=60, zorder=5, edgecolors='black', linewidths=0.5,
-                   label=f'{alg} (Proposed)' if alg == 'BBO-DRL' else alg)
+                   label=f'{alg} (Proposed)' if alg == 'DQN-ES' else alg)
         # Annotation with offset
         off_x = (pts_e.max() - pts_e.min()) * 0.02
         off_y = (pts_l.max() - pts_l.min()) * 0.02
@@ -546,11 +546,11 @@ def _compute_pareto_front(energy: np.ndarray, latency: np.ndarray) -> np.ndarray
     return is_pareto
 
 
-# ---- Figure 6: BBO-DRL convergence ----
+# ---- Figure 6: DQN-ES convergence ----
 
 def _fig_convergence_bbo(figures_dir: Path):
     """
-    Simulate convergence curves for BBO-DRL, PSO, and ACO.
+    Simulate convergence curves for DQN-ES, PSO, and ACO.
     cost(t) = A * exp(-k * t / T) + floor + noise
     """
     rng = np.random.default_rng(42)
@@ -558,7 +558,7 @@ def _fig_convergence_bbo(figures_dir: Path):
     t = np.arange(T)
 
     curves = {
-        'BBO-DRL': (1.0, 3.0, 0.30, 0.02),   # (start_amp, k, floor, noise_std)
+        'DQN-ES': (1.0, 3.0, 0.30, 0.02),   # (start_amp, k, floor, noise_std)
         'PSO':     (1.0, 1.8, 0.45, 0.025),
         'ACO':     (1.0, 1.2, 0.55, 0.030),
     }
@@ -576,15 +576,15 @@ def _fig_convergence_bbo(figures_dir: Path):
         for i in range(1, T):
             smooth[i] = alpha * raw[i] + (1 - alpha) * smooth[i - 1]
 
-        lw = 1.4 if alg == 'BBO-DRL' else 0.9
+        lw = 1.4 if alg == 'DQN-ES' else 0.9
         ax.plot(t, raw, color=COLORS[alg], alpha=0.2, linewidth=0.4)
         ax.plot(t, smooth, color=COLORS[alg],
                 linewidth=lw, linestyle=LINE_STYLES[alg],
-                label=f'{alg} (Proposed)' if alg == 'BBO-DRL' else alg)
+                label=f'{alg} (Proposed)' if alg == 'DQN-ES' else alg)
 
     ax.set_xlabel('Tasks Processed', fontsize=8)
     ax.set_ylabel('Normalised Cost Function', fontsize=8)
-    ax.set_title('BBO-DRL Convergence vs. Baselines', fontsize=8, pad=4)
+    ax.set_title('DQN-ES Convergence vs. Baselines', fontsize=8, pad=4)
     ax.set_ylim(0.0, 1.2)
     ax.grid(True, linestyle='--', alpha=0.35, linewidth=0.5)
     ax.spines['top'].set_visible(False)
@@ -620,8 +620,8 @@ def _fig_performance_bar(mc_summary, ref_scale, alg_names, figures_dir: Path):
             errs.append(d.get('std', 0.0))
 
         bar_colors = [COLORS[a] for a in alg_names]
-        # Highlight BBO-DRL
-        bbo_idx = alg_names.index('BBO-DRL')
+        # Highlight DQN-ES
+        bbo_idx = alg_names.index('DQN-ES')
         edge_widths = [1.2 if i == bbo_idx else 0.5 for i in range(len(alg_names))]
 
         bars = ax.bar(x, vals, width=bar_width, color=bar_colors,
@@ -649,7 +649,7 @@ def _fig_performance_bar(mc_summary, ref_scale, alg_names, figures_dir: Path):
     legend_patches = [
         mpatches.Patch(facecolor=COLORS[a],
                        edgecolor='black', linewidth=0.5,
-                       label=f'{a} (Proposed)' if a == 'BBO-DRL' else a)
+                       label=f'{a} (Proposed)' if a == 'DQN-ES' else a)
         for a in alg_names
     ]
     fig.legend(handles=legend_patches, loc='lower center',
@@ -711,7 +711,7 @@ def _print_scale_table(n_tasks: int, scale_summary: dict, alg_names: list) -> No
         priv = d.get('avg_privacy_risk', {}).get('mean', 0.0)
         sla  = d.get('sla_violation_pct', {}).get('mean', 0.0)
         thr  = d.get('throughput', {}).get('mean', 0.0)
-        tag  = ' *' if alg == 'BBO-DRL' else '  '
+        tag  = ' *' if alg == 'DQN-ES' else '  '
         print(f'  {alg + tag:<14} {lat:>12.2f} {eng:>11.4f} '
               f'{priv:>10.4f} {sla:>10.2f} {thr:>11.1f}')
     print(f'  {sep}')

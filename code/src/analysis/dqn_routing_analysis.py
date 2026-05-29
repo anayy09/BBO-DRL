@@ -2,7 +2,7 @@
 dqn_routing_analysis.py — Fix G (Fix2.md): DQN-only routing distribution.
 
 Anomaly 1 explanation: DQN-only has disproportionately high energy (35.17 mJ
-vs BBO-DRL 7.36 mJ).  Root cause: during early exploration (epsilon ≈ 1.0),
+vs DQN-ES 7.36 mJ).  Root cause: during early exploration (epsilon ≈ 1.0),
 DQN-only routes tasks randomly, often to the cloud node.  Cloud offloading
 incurs high transmission energy (E_off = P_tx · t_tx + P_idle · t_wait) over
 long wireless links.  As epsilon decays, routing shifts toward lower-energy

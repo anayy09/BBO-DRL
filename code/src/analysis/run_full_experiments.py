@@ -1,15 +1,15 @@
 """
 run_full_experiments.py — Q1 master Monte Carlo driver.
 
-Addresses Fix 1 (N_RUNS=30 globally enforced), Fix 2 (BBO-only + DQN-only
+Addresses Fix 1 (N_RUNS=30 globally enforced), Fix 2 (ES-only + DQN-only
 ablations included), Fix 3 (Local-Only SLA violations now non-zero due to
 realistic cycle counts in TASK_PROFILES), Fix 5 (N=5000 scale added), and
-Fix 7 (epsilon trajectory captured for BBO-DRL).
+Fix 7 (epsilon trajectory captured for DQN-ES).
 
 Outputs:
   results/mc_full_results.json          Per-run raw metrics
   results/mc_full_summary.json          Mean ± std per (scale, algorithm)
-  results/epsilon_trajectory.json       BBO-DRL epsilon vs. tasks processed
+  results/epsilon_trajectory.json       DQN-ES epsilon vs. tasks processed
   results/table3_n1000.csv              Table III (primary comparison)
 
 The orchestration script `run_q1_pipeline.py` then calls statistical_tests
@@ -156,28 +156,34 @@ def run_full(
     print('=' * 72)
 
     t0 = time.time()
+    import concurrent.futures
     for n_tasks in task_scales:
         print(f'\n[Q1-MC] Scale n={n_tasks}')
+        
+        # Batch all algorithms together to maximize CPU utilization
+        args_list = []
         for alg in alg_names:
             sched_cls = registry[alg]
-            args_list = [(alg, sched_cls, n_tasks, run_id, topo, GLOBAL_SEED) for run_id in range(n_runs)]
-            import concurrent.futures
-            
-            with concurrent.futures.ProcessPoolExecutor(max_workers=workers) as executor:
-                if _TQDM:
-                    it = tqdm(executor.map(_run_single_wrapper, args_list), total=n_runs, desc=f'  {alg:<10s}', leave=False, ncols=70)
-                else:
-                    it = executor.map(_run_single_wrapper, args_list)
+            for run_id in range(n_runs):
+                args_list.append((alg, sched_cls, n_tasks, run_id, topo, GLOBAL_SEED))
                 
-                for run_id, m, eps_hist, err in it:
-                    if err:
-                        warnings.warn(f'[Q1-MC] {alg} n={n_tasks} run={run_id} failed: {err}')
-                        continue
-                    mc_raw[n_tasks][alg].append(m)
-                    if (alg == 'BBO-DRL' and n_tasks == PRIMARY_SCALE and eps_hist is not None):
-                        eps_trajectories.setdefault(run_id, eps_hist)
+        with concurrent.futures.ProcessPoolExecutor(max_workers=workers) as executor:
+            if _TQDM:
+                it = tqdm(executor.map(_run_single_wrapper, args_list), total=len(args_list), desc=f'  Tasks {n_tasks}', leave=False, ncols=70)
+            else:
+                it = executor.map(_run_single_wrapper, args_list)
+            
+            for i, (run_id, m, eps_hist, err) in enumerate(it):
+                alg = args_list[i][0]
+                if err:
+                    warnings.warn(f'[Q1-MC] {alg} n={n_tasks} run={run_id} failed: {err}')
+                    continue
+                mc_raw[n_tasks][alg].append(m)
+                if (alg == 'DQN-ES' and n_tasks == PRIMARY_SCALE and eps_hist is not None):
+                    eps_trajectories.setdefault(run_id, eps_hist)
 
-            # Aggregate
+        # Aggregate for all algorithms at this scale
+        for alg in alg_names:
             agg = {}
             for key in metric_keys:
                 vals = np.array([r[key] for r in mc_raw[n_tasks][alg]
@@ -228,7 +234,7 @@ def _print_table(n_tasks, scale, alg_names):
         prv = d.get('avg_privacy_risk', {}).get('mean', 0)
         sla = d.get('sla_violation_pct', {}).get('mean', 0)
         thr = d.get('throughput', {}).get('mean', 0)
-        tag = '*' if alg == 'BBO-DRL' else ' '
+        tag = '*' if alg == 'DQN-ES' else ' '
         print(f'  {alg+tag:<12} {lat:>10.2f} {eng:>10.4f} '
               f'{prv:>8.4f} {sla:>8.2f} {thr:>10.1f}')
 

@@ -1,5 +1,5 @@
 """
-figures_q1.py — clean IEEE-style figure set for the BBO-DRL manuscript.
+figures_q1.py — clean IEEE-style figure set for the DQN-ES manuscript.
 
 Design choices (kept across every figure in the set):
 
@@ -8,14 +8,14 @@ Design choices (kept across every figure in the set):
 * No plot titles.  LaTeX captions carry the same text, so duplicating
   inside the figure adds clutter.  The only exception is a panel label
   on multi-panel figures.
-* Wong-style color-blind-safe palette.  On line plots, BBO-DRL is the
+* Wong-style color-blind-safe palette.  On line plots, DQN-ES is the
     only filled marker with a thicker stroke; Pareto markers are filled
     for legibility.
 * Shaded +/-1 SD bands instead of capped error bars on line plots; for
   bars we use thin capped error bars only.
 * No legend inside the plot box when an alternative exists.  Either a
   single legend strip across the bottom or a one-line annotation next to
-  the BBO-DRL trace.
+  the DQN-ES trace.
 * No annotations on Pareto plots.  Markers + a small legend say the same
   thing without overlap.
 
@@ -89,9 +89,9 @@ plt.rcParams.update({
 # vermillion (D55E00), reddish purple (CC79A7), blue (0072B2), black (000000)
 # ---------------------------------------------------------------------------
 COLORS: Dict[str, str] = {
-    'BBO-DRL':    '#D55E00',   # vermillion — single emphasised series
-    'PSO+DQN':    '#E69F00',   # bright orange — Fix A: control condition
-    'BBO-only':   '#CC79A7',   # reddish purple
+    'DQN-ES':    '#D55E00',   # vermillion — single emphasised series
+    'PSO':    '#E69F00',   # bright orange — Fix A: control condition
+    'ES-only':   '#CC79A7',   # reddish purple
     'DQN-only':   '#0072B2',   # blue
     'PSO':        '#009E73',   # green
     'ACO':        '#F0E442',   # yellow
@@ -100,9 +100,9 @@ COLORS: Dict[str, str] = {
     'Cloud-Only': '#000000',   # black
 }
 MARKERS: Dict[str, str] = {
-    'BBO-DRL':    'o',
-    'PSO+DQN':    'h',         # hexagon — Fix A
-    'BBO-only':   's',
+    'DQN-ES':    'o',
+    'PSO':    'h',         # hexagon — Fix A
+    'ES-only':   's',
     'DQN-only':   'D',
     'PSO':        '^',
     'ACO':        'v',
@@ -112,15 +112,15 @@ MARKERS: Dict[str, str] = {
 }
 # Default order across every figure (Fix A: PSO+DQN added)
 DEFAULT_ORDER: List[str] = [
-    'BBO-DRL', 'PSO+DQN', 'BBO-only', 'DQN-only',
+    'DQN-ES', 'ES-only', 'DQN-only',
     'PSO', 'ACO', 'HS-HHO',
     'Local-Only', 'Cloud-Only',
 ]
 
 
 def _style_for(alg: str) -> dict:
-    """Per-algorithm style overrides.  BBO-DRL is emphasised."""
-    if alg == 'BBO-DRL':
+    """Per-algorithm style overrides.  DQN-ES is emphasised."""
+    if alg == 'DQN-ES':
         return dict(linewidth=1.8, markersize=5.5, zorder=10,
                     markerfacecolor=COLORS[alg],
                     markeredgecolor=COLORS[alg])
@@ -133,8 +133,8 @@ def _bar_legend_handles(algs: Sequence[str]) -> List[Patch]:
     """Legend handles that match the horizontal bar styling."""
     handles: List[Patch] = []
     for alg in algs:
-        edge = 'black' if alg == 'BBO-DRL' else 'none'
-        lw = 1.0 if alg == 'BBO-DRL' else 0.0
+        edge = 'black' if alg == 'DQN-ES' else 'none'
+        lw = 1.0 if alg == 'DQN-ES' else 0.0
         handles.append(Patch(facecolor=COLORS[alg], edgecolor=edge,
                              linewidth=lw, label=alg))
     return handles
@@ -144,7 +144,7 @@ def _scatter_legend_handles(algs: Sequence[str]) -> List[Line2D]:
     """Legend handles for Pareto scatter markers."""
     handles: List[Line2D] = []
     for alg in algs:
-        is_bbodrl = (alg == 'BBO-DRL')
+        is_bbodrl = (alg == 'DQN-ES')
         handles.append(Line2D(
             [0], [0],
             marker=MARKERS[alg],
@@ -182,7 +182,7 @@ def fig_latency_vs_scale(summary, figures_dir, scales=None,
     Default trims to 6 series so the legend stays readable.
     """
     scales = scales or sorted(summary.keys())
-    algs = algs or ['BBO-DRL', 'PSO+DQN', 'BBO-only', 'DQN-only',
+    algs = algs or ['DQN-ES', 'ES-only', 'DQN-only',
                     'PSO', 'HS-HHO', 'Local-Only', 'Cloud-Only']
 
     fig, ax = plt.subplots(figsize=(3.5, 2.4))
@@ -219,7 +219,7 @@ def fig_latency_vs_scale(summary, figures_dir, scales=None,
 def fig_energy_sla_vs_scale(summary, figures_dir, scales=None,
                              algs: Iterable[str] | None = None):
     scales = scales or sorted(summary.keys())
-    algs = algs or ['BBO-DRL', 'PSO+DQN', 'BBO-only', 'DQN-only',
+    algs = algs or ['DQN-ES', 'ES-only', 'DQN-only',
                     'PSO', 'HS-HHO', 'Local-Only', 'Cloud-Only']
 
     fig, axes = plt.subplots(1, 2, figsize=(7.16, 2.6))
@@ -268,8 +268,8 @@ def _hbar_panel(ax, algs, values, errors, xlabel, *,
     layout."""
     y = np.arange(len(algs))
     face = [COLORS[a] for a in algs]
-    edge = ['black' if a == 'BBO-DRL' else 'none' for a in algs]
-    lw   = [1.0 if a == 'BBO-DRL' else 0.0 for a in algs]
+    edge = ['black' if a == 'DQN-ES' else 'none' for a in algs]
+    lw   = [1.0 if a == 'DQN-ES' else 0.0 for a in algs]
     ax.barh(y, values, xerr=errors, color=face, edgecolor=edge,
             linewidth=lw, height=0.62, capsize=2,
             error_kw={'linewidth': 0.6, 'ecolor': '#444444'})
@@ -358,7 +358,7 @@ def _fig_pareto(summary, ref_scale, x_key, y_key, x_label, y_label,
     fig, ax = plt.subplots(figsize=(5.0, 3.2))
 
     for i, alg in enumerate(names):
-        is_bbodrl = (alg == 'BBO-DRL')
+        is_bbodrl = (alg == 'DQN-ES')
         ax.scatter(
             xs_a[i], ys_a[i],
             facecolors=COLORS[alg],
@@ -447,10 +447,10 @@ def fig_epsilon_convergence(trajectory_path: Path, figures_dir: Path):
                 stack = np.array([a[:T_meas] for a in arrs])
                 mu = stack.mean(axis=0); sd = stack.std(axis=0)
                 t = np.arange(1, T_meas + 1)
-                ax.plot(t, mu, color=COLORS['BBO-DRL'], linewidth=1.6,
+                ax.plot(t, mu, color=COLORS['DQN-ES'], linewidth=1.6,
                         label=f'Measured (n={stack.shape[0]})')
                 ax.fill_between(t, np.clip(mu - sd, 0, None), mu + sd,
-                                color=COLORS['BBO-DRL'], alpha=0.18,
+                                color=COLORS['DQN-ES'], alpha=0.18,
                                 linewidth=0)
         except Exception:
             pass
@@ -525,7 +525,7 @@ def fig_weight_ablation(
         ('avg_privacy_risk',  'Privacy risk'),
         ('sla_violation_pct', 'SLA violations (%)'),
     ]
-    palette = ['#999999', '#56B4E9', '#009E73', COLORS['BBO-DRL']]
+    palette = ['#999999', '#56B4E9', '#009E73', COLORS['DQN-ES']]
 
     n_rows = 2 if highci_data is not None else 1
     fig, axes = plt.subplots(
@@ -601,7 +601,7 @@ def fig_privacy_guard_roc(metrics_path: Path, figures_dir: Path):
     auc = float(m.get('AUC', 0.0))
 
     fig, ax = plt.subplots(figsize=(3.5, 2.7))
-    ax.plot(fpr_arr, tpr_arr, color=COLORS['BBO-DRL'],
+    ax.plot(fpr_arr, tpr_arr, color=COLORS['DQN-ES'],
             linewidth=1.6, label=f'Privacy Guard (AUC = {auc:.3f})')
     ax.plot([0, 1], [0, 1], color='#999999', linestyle='--',
             linewidth=0.6, label='Chance')
@@ -639,7 +639,7 @@ def fig_shap_summary(shap_path: Path, figures_dir: Path):
 
     fig, ax = plt.subplots(figsize=(3.5, 2.4))
     y = np.arange(len(names))
-    ax.barh(y, vals, color=COLORS['BBO-DRL'], height=0.6,
+    ax.barh(y, vals, color=COLORS['DQN-ES'], height=0.6,
             edgecolor='none')
     ax.set_yticks(y)
     ax.set_yticklabels(names)
@@ -709,7 +709,7 @@ def fig_mg1_sensitivity(mg1_path: Path, figures_dir: Path) -> None:
 
     Panel (b): privacy risk vs cv for same algorithms — shows the metric is
     completely invariant to the queuing model, confirming the privacy
-    advantage is intrinsic to BBO-DRL routing rather than the M/M/1 delay.
+    advantage is intrinsic to DQN-ES routing rather than the M/M/1 delay.
     """
     if not mg1_path.exists():
         print(f'[FIG] Skipping M/G/1: {mg1_path} not found')

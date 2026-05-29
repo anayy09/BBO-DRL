@@ -2,7 +2,7 @@
 weight_ablation.py — Fix 6 + Fix B: CI weight function ablation.
 
 Compares four CI-to-weight schemes (flat, step, linear, proposed
-non-linear) for BBO-DRL at the primary scale, 30 Monte Carlo trials each.
+non-linear) for DQN-ES at the primary scale, 30 Monte Carlo trials each.
 
 Fix B: also runs all-high-CI ICU scenario (Phi in [0.8, 1.0]) to test
 whether the non-linear scheme separates from alternatives under maximum
@@ -37,7 +37,7 @@ _CODE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(
 if _CODE_DIR not in sys.path:
     sys.path.insert(0, _CODE_DIR)
 
-from src.algorithms.bbo_drl import BBODRLScheduler
+from src.algorithms.dqn_es import DQNESScheduler
 from src.config import (
     GLOBAL_SEED,
     N_FOG_NODES,
@@ -73,14 +73,17 @@ def _to_healthcare(t, topo):
     )
 
 
-def _run_once(n_tasks, run_id, topo, ci_distribution='mixed'):
+def _run_once(payload):
+    n_tasks, run_id, topo, ci_distribution, mode = payload
+    set_weight_mode(mode)
+
     import random as _r
     seed = GLOBAL_SEED + run_id * 1000 + n_tasks
     _r.seed(seed)
     np.random.seed(seed)
     raws = generate_synthetic_tasks(n_tasks, ci_distribution, seed=seed)
     tasks = [_to_healthcare(t, topo) for t in raws]
-    sched = BBODRLScheduler(topo, seed=seed)
+    sched = DQNESScheduler(topo, seed=seed)
     env = OffloadingEnvironment(topo, sched, n_tasks=n_tasks, seed=seed)
     res = env.run(tasks)
     if not res:
@@ -132,6 +135,7 @@ def run_ablation(
     n_runs: int,
     out_dir: Path,
     ci_distribution: str = 'mixed',
+    workers: int | None = None,
 ) -> dict:
     """
     Run the weight-scheme ablation.
@@ -149,16 +153,23 @@ def run_ablation(
     print(f'[WEIGHT-AB] ci_distribution={ci_distribution} ({label})')
 
     raw: dict = defaultdict(list)
-    for mode in WEIGHT_MODES:
-        print(f'[WEIGHT-AB] Mode={mode}  ({n_runs} runs, n_tasks={n_tasks})')
-        set_weight_mode(mode)
-        it = range(n_runs)
+    import concurrent.futures
+    payloads = [(n_tasks, run_id, topo, ci_distribution, mode) for mode in WEIGHT_MODES for run_id in range(n_runs)]
+    
+    if workers is None:
+        workers = max(1, (os.cpu_count() or 2) - 1)
+    
+    print(f'[WEIGHT-AB] Dispatching {len(payloads)} tasks over {workers} workers...')
+    
+    with concurrent.futures.ProcessPoolExecutor(max_workers=workers) as executor:
         if _TQDM:
-            it = tqdm(it, desc=f'  {mode:<10s}', leave=False, ncols=70)
-        for run_id in it:
-            m = _run_once(n_tasks, run_id, topo, ci_distribution=ci_distribution)
-            if m is not None:
-                raw[mode].append(m)
+            results = list(tqdm(executor.map(_run_once, payloads), total=len(payloads), desc='  Ablation', ncols=70))
+        else:
+            results = list(executor.map(_run_once, payloads))
+            
+    for payload, m in zip(payloads, results):
+        if m is not None:
+            raw[payload[4]].append(m)
     set_weight_mode('nonlinear')
 
     # Aggregate
