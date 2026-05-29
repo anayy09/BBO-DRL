@@ -4,7 +4,7 @@ Monte Carlo simulation runner.
 Executes the full comparative experiment:
   - 6 task scales: [100, 500, 1000, 2000, 5000, 10000]
   - 30 Monte Carlo runs per (algorithm Ã— scale) configuration
-  - 6 algorithms: BBO-DRL, PSO, ACO, HS-HHO, LocalOnly, CloudOnly
+  - 6 algorithms: DQN-ES, PSO, ACO, HS-HHO, LocalOnly, CloudOnly
   - Results: mean Â± std per metric, saved to JSON
 
 Usage:
@@ -29,7 +29,7 @@ if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
 from src.algorithms.aco import ACOScheduler
-from src.algorithms.bbo_drl import BBODRLScheduler
+from src.algorithms.dqn_es import DQNESScheduler
 from src.algorithms.cloud_only import CloudOnlyScheduler
 from src.algorithms.hs_hho import HSHHOScheduler
 from src.algorithms.local_only import LocalOnlyScheduler
@@ -69,7 +69,7 @@ def build_algorithms(topology, seed: int = 42) -> Dict[str, object]:
     dict mapping algorithm_name â†’ scheduler instance
     """
     return {
-        'BBO-DRL':   BBODRLScheduler(topology, seed=seed),
+        'DQN-ES':   DQNESScheduler(topology, seed=seed),
         'PSO':       PSOScheduler(topology, seed=seed),
         'ACO':       ACOScheduler(topology, seed=seed),
         'HS-HHO':    HSHHOScheduler(topology, seed=seed),
@@ -208,7 +208,7 @@ def run_monte_carlo(
         # Per-algorithm accumulator
         # algo_name â†’ list of SimulationMetrics
         algo_mc_results: Dict[str, List[SimulationMetrics]] = {
-            'BBO-DRL':   [],
+            'DQN-ES':   [],
             'PSO':       [],
             'ACO':       [],
             'HS-HHO':    [],
