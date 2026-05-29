@@ -47,7 +47,7 @@ def _header(msg):
 
 def main():
     p = argparse.ArgumentParser(
-        description='BBO-DRL Q1 elevation pipeline (Fix.md + Fix2.md).'
+        description='DQN-ES Q1 elevation pipeline (Fix.md + Fix2.md).'
     )
     p.add_argument('--n_runs',       type=int, default=30)
     p.add_argument('--scales',       type=int, nargs='+', default=None)
@@ -97,7 +97,7 @@ def main():
     if not args.skip_stats:
         _header('Step 2 — Wilcoxon + Bonferroni (6 baselines × 4 metrics = 24)')
         from src.analysis.statistical_tests import run_pairwise_tests
-        run_pairwise_tests(RESULTS_DIR / 'mc_full_summary.json', RESULTS_DIR)
+        run_pairwise_tests(RESULTS_DIR / 'mc_full_summary.json', RESULTS_DIR, workers=args.workers)
 
     # ------------------------------------------------------------------
     # Step 3: Mixed-CI weight ablation (Fix 6)
@@ -106,8 +106,7 @@ def main():
         _header('Step 3 — CI weight ablation (mixed-CI workload, Fix 6)')
         from src.analysis.weight_ablation import run_ablation
         from src.config import PRIMARY_SCALE
-        run_ablation(PRIMARY_SCALE, args.n_runs, RESULTS_DIR,
-                     ci_distribution='mixed')
+        run_ablation(PRIMARY_SCALE, args.n_runs, RESULTS_DIR, ci_distribution='mixed', workers=args.workers)
 
     # ------------------------------------------------------------------
     # Step 4: Privacy Guard AUC validation (Fix 8; Fix D: sklearn AUC)
@@ -115,7 +114,7 @@ def main():
     if not args.skip_privacy:
         _header('Step 4 — Privacy Guard on MedSec-25 (Fix 8, Fix D: sklearn AUC)')
         from src.analysis.privacy_guard import run_validation
-        run_validation(DATA_DIR, RESULTS_DIR, FIGURES_DIR)
+        run_validation(DATA_DIR, RESULTS_DIR, FIGURES_DIR, workers=args.workers)
 
     # ------------------------------------------------------------------
     # Step 5: MIT-BIH real-trace evaluation (Fix 10)
@@ -176,8 +175,7 @@ def main():
         _header('Step 8 — All-high-CI weight ablation ICU scenario (Fix B)')
         from src.analysis.weight_ablation import run_ablation
         from src.config import PRIMARY_SCALE
-        run_ablation(PRIMARY_SCALE, args.n_runs, RESULTS_DIR,
-                     ci_distribution='all_high')
+        run_ablation(PRIMARY_SCALE, args.n_runs, RESULTS_DIR, ci_distribution='all_high', workers=args.workers)
 
     # ------------------------------------------------------------------
     # Step 9: Scheduling overhead (Fix C)
@@ -207,7 +205,7 @@ def main():
                              workers=args.workers)
 
     # ------------------------------------------------------------------
-    # Step 13: Framing note (Fix A — assess PSO+DQN vs BBO-DRL on privacy)
+    # Step 13: Framing note (Fix A — assess PSO+DQN vs DQN-ES on privacy)
     # ------------------------------------------------------------------
     _write_framing_note(RESULTS_DIR)
 
@@ -229,7 +227,7 @@ def main():
 
 def _write_framing_note(results_dir: Path) -> None:
     """
-    Fix A: generate framing_note.txt assessing PSO+DQN vs BBO-DRL result.
+    Fix A: generate framing_note.txt assessing PSO+DQN vs DQN-ES result.
     Reads from mc_full_summary.json if available; otherwise writes a stub.
     """
     results_dir.mkdir(parents=True, exist_ok=True)
@@ -239,7 +237,7 @@ def _write_framing_note(results_dir: Path) -> None:
     if not mc_path.exists():
         with open(note_path, 'w', encoding='utf-8') as fh:
             fh.write(
-                'FRAMING NOTE (Fix A — PSO+DQN vs BBO-DRL assessment)\n'
+                'FRAMING NOTE (Fix A — PSO+DQN vs DQN-ES assessment)\n'
                 '=====================================================\n\n'
                 'mc_full_summary.json not yet available.\n'
                 'Re-run after Step 1 (Monte Carlo) completes.\n'
@@ -255,18 +253,18 @@ def _write_framing_note(results_dir: Path) -> None:
 
     scale_key = '1000'
     cell = summary.get(scale_key, {})
-    bbodrl  = cell.get('BBO-DRL',  {})
-    psodqn  = cell.get('PSO+DQN', {})
+    bbodrl  = cell.get('DQN-ES',  {})
+    psodqn  = cell.get({})
 
     metrics = ['avg_latency_ms', 'avg_energy_mj',
                'avg_privacy_risk', 'sla_violation_pct']
 
     lines = [
-        'FRAMING NOTE (Fix A — PSO+DQN vs BBO-DRL assessment)',
+        'FRAMING NOTE (Fix A — PSO+DQN vs DQN-ES assessment)',
         '=====================================================',
         '',
         'Purpose: Determine whether the BBO inner-loop specifically contributes',
-        'to BBO-DRL\'s advantages, or whether any DRL+bio-inspired hybrid',
+        'to DQN-ES\'s advantages, or whether any DRL+bio-inspired hybrid',
         '(e.g., PSO+DQN) achieves the same result.',
         '',
         f'Reference scale: N={scale_key} tasks, 30 MC replicates.',
@@ -274,7 +272,7 @@ def _write_framing_note(results_dir: Path) -> None:
         'Results:',
     ]
 
-    pso_dqn_matches = []
+    pso_matches = []
     for metric in metrics:
         bbo_s = np.array(bbodrl.get(metric, {}).get('samples', []), dtype=float)
         pso_s = np.array(psodqn.get(metric, {}).get('samples', []), dtype=float)
@@ -295,11 +293,11 @@ def _write_framing_note(results_dir: Path) -> None:
         sig = 'SIGNIFICANT' if (not np.isnan(p_corr) and p_corr < 0.05) else 'not significant'
         lines.append(
             f'  {metric}:'
-            f'  BBO-DRL={bbo_mu:.3f}  PSO+DQN={pso_mu:.3f}'
+            f'  DQN-ES={bbo_mu:.3f}  PSO+DQN={pso_mu:.3f}'
             f'  diff={diff_pct:+.1f}%'
             f'  p_corr={p_corr:.3e}  [{sig}]'
         )
-        pso_dqn_matches.append(not (not np.isnan(p_corr) and p_corr < 0.05))
+        pso_matches.append(not (not np.isnan(p_corr) and p_corr < 0.05))
 
     lines += ['']
 
@@ -310,14 +308,14 @@ def _write_framing_note(results_dir: Path) -> None:
     lines.append('FRAMING RECOMMENDATION:')
     if privacy_bbo < privacy_pso * 0.95:
         lines.append(
-            '  BBO-DRL outperforms PSO+DQN on privacy risk by >5%.'
+            '  DQN-ES outperforms PSO+DQN on privacy risk by >5%.'
             '  The BBO-specific contribution is defensible.'
             '  Main claim: "BBO provides superior exploration for privacy-aware'
             '  routing vs PSO in the DRL+bio-inspired hybrid framework."'
         )
     elif abs(privacy_bbo - privacy_pso) / max(privacy_pso, 1e-12) < 0.05:
         lines.append(
-            '  BBO-DRL and PSO+DQN are statistically indistinguishable on privacy (<5% diff).'
+            '  DQN-ES and PSO+DQN are statistically indistinguishable on privacy (<5% diff).'
             '  REFRAMING REQUIRED: The contribution is the DRL+bio-inspired coupling'
             '  design, not BBO specifically.  Remove any claims that BBO uniquely'
             '  drives the privacy advantage.  Retitle contribution as:'

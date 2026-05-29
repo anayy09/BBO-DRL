@@ -1,5 +1,5 @@
 """
-Central hyperparameter configuration for the Q1 BBO-DRL paper.
+Central hyperparameter configuration for the Q1 DQN-ES paper.
 
 All Monte Carlo runs, ablations, and statistical analyses import from
 this single file so that the experimental protocol is reproducible and
@@ -29,7 +29,7 @@ N_FOG_NODES:     int        = 3
 
 
 # ---------------------------------------------------------------------------
-# BBO-DRL hyperparameters  (Fix 7: explicit epsilon decay schedule)
+# DQN-ES hyperparameters  (Fix 7: explicit epsilon decay schedule)
 # ---------------------------------------------------------------------------
 # Epsilon-greedy exploration schedule:
 #   epsilon(t+1) = max(epsilon_min, epsilon(t) * epsilon_decay)
@@ -96,7 +96,7 @@ MITBIH_RHO:          float = 0.9
 # ---------------------------------------------------------------------------
 # Statistical testing  (Fix 4, Fix E: updated for PSO+DQN)
 # ---------------------------------------------------------------------------
-# Significance tested on four metrics across all baselines vs BBO-DRL.
+# Significance tested on four metrics across all baselines vs DQN-ES.
 # Bonferroni correction: alpha_corrected = 0.05 / (n_baselines * n_metrics)
 STAT_ALPHA:          float = 0.05
 STAT_METRICS:        list[str] = [
@@ -105,7 +105,7 @@ STAT_METRICS:        list[str] = [
 ]
 # Fix A: PSO+DQN added — family size is now 6 × 4 = 24
 STAT_BASELINES:      list[str] = [
-    'PSO+DQN', 'PSO', 'ACO', 'HS-HHO', 'BBO-only', 'DQN-only',
+    'PSO', 'ACO', 'HS-HHO', 'ES-only', 'DQN-only',
 ]
 # Bonferroni denominator = len(STAT_BASELINES) * len(STAT_METRICS) = 24
 
@@ -116,23 +116,21 @@ STAT_BASELINES:      list[str] = [
 def get_full_algorithm_registry():
     """
     Return the complete algorithm registry including PSO+DQN (Fix A),
-    BBO-only and DQN-only ablations.
+    ES-only and DQN-only ablations.
     Imported lazily to avoid circular imports at module load.
     """
     from src.algorithms.aco import ACOScheduler
-    from src.algorithms.bbo_drl import BBODRLScheduler
-    from src.algorithms.bbo_only import BBOOnlyScheduler
+    from src.algorithms.dqn_es import DQNESScheduler
+    from src.algorithms.es_only import ESOnlyScheduler
     from src.algorithms.cloud_only import CloudOnlyScheduler
     from src.algorithms.dqn_only import DQNOnlyScheduler
     from src.algorithms.hs_hho import HSHHOScheduler
     from src.algorithms.local_only import LocalOnlyScheduler
     from src.algorithms.pso import PSOScheduler
-    from src.algorithms.pso_dqn import PSODQNScheduler
 
     return {
-        'BBO-DRL':    BBODRLScheduler,
-        'PSO+DQN':    PSODQNScheduler,
-        'BBO-only':   BBOOnlyScheduler,
+        'DQN-ES':     DQNESScheduler,
+        'ES-only':    ESOnlyScheduler,
         'DQN-only':   DQNOnlyScheduler,
         'PSO':        PSOScheduler,
         'ACO':        ACOScheduler,
@@ -145,7 +143,7 @@ def get_full_algorithm_registry():
 def summary() -> str:
     """Return a human-readable summary of all hyperparameters."""
     return (
-        f"BBO-DRL Q1 hyperparameter summary\n"
+        f"DQN-ES Q1 hyperparameter summary\n"
         f"  Monte Carlo: N_RUNS={N_RUNS}  scales={TASK_SCALES}\n"
         f"  Epsilon: init={EPSILON_INIT} decay={EPSILON_DECAY} "
         f"min={EPSILON_MIN}\n"
