@@ -163,11 +163,15 @@ class BaseScheduler(ABC):
         if is_local:
             privacy_risk = 0.0
         else:
-            # FIX C6: offload_history is now a deque; convert to counts for compute_privacy_risk
             device_deque = self.offload_history.get(task.device_id, deque())
             counts: Dict[int, int] = {}
             for nid in device_deque:
-                counts[nid] = counts.get(nid, 0) + 1
+                if nid != task.device_id:  # Exclude local execution from network entropy
+                    counts[nid] = counts.get(nid, 0) + 1
+            
+            # PROSPECTIVE FIX: add the node_id being evaluated to the counts
+            counts[node_id] = counts.get(node_id, 0) + 1
+
             n_available = len(self._candidate_nodes)
             privacy_risk = compute_privacy_risk(
                 task.privacy_sensitivity,

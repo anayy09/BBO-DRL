@@ -1,7 +1,7 @@
 """
 DQN-only ablation scheduler  (Fix 2 — required for any hybrid claim).
 
-Identical to BBO-DRL except the BBO local-search phase is removed.  The
+Identical to DQN-ES except the BBO local-search phase is removed.  The
 DQN outputs Q-values for all candidate nodes and the scheduler greedily
 selects argmax (still using epsilon-greedy exploration during training).
 
@@ -16,7 +16,7 @@ from typing import List, Optional
 import numpy as np
 
 from src.algorithms.base_scheduler import BaseScheduler
-from src.algorithms.bbo_drl import DQNNetwork, ReplayBuffer
+from src.algorithms.dqn_es import DQNNetwork, ReplayBuffer
 from src.config import (
     DQN_BATCH_SIZE,
     DQN_GAMMA,
@@ -37,7 +37,7 @@ class DQNOnlyScheduler(BaseScheduler):
     Pure DQN policy over the full candidate-node set, no BBO refinement.
 
     Architecture, replay buffer, target-network sync, and reward shaping
-    are inherited from BBODRLScheduler's design for a like-for-like
+    are inherited from DQNESScheduler's design for a like-for-like
     ablation.
     """
 
