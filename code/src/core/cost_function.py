@@ -296,7 +296,11 @@ def compute_privacy_risk(
     Privacy risk ∈ [0, 1].
     """
     h = compute_privacy_entropy(offload_counts)
-    h_max = math.log2(n_available_nodes) if n_available_nodes > 1 else 1.0
+    # FIX M2: H_max must cover all M+3 destinations (local + edge + fog + cloud).
+    # n_available_nodes passed here is the number of remote candidate nodes;
+    # add 1 for local execution to get the full destination count.
+    total_destinations = n_available_nodes + 1
+    h_max = math.log2(total_destinations) if total_destinations > 1 else 1.0
     concentration = 1.0 - h / max(h_max, 1e-12)
     return float(privacy_sensitivity * max(0.0, min(1.0, concentration)))
 

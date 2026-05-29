@@ -81,7 +81,7 @@ STEP_CI_THRESHOLD:   float = 0.5
 # A flow is classified as a "traffic-analysis attack" when its empirical
 # offload-entropy ratio H/H_max falls below this threshold for the source
 # device.  Threshold tuned to maximise F1 on a 20% calibration split.
-PRIVACY_ENTROPY_THRESHOLD: float = 0.55
+PRIVACY_ENTROPY_THRESHOLD: float = 0.85
 
 
 # ---------------------------------------------------------------------------

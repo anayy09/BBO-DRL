@@ -289,7 +289,7 @@ def parse_medsec(data_dir: str,
     # Stratified downsampling
     events = _stratified_sample(per_label, max_output_rows, rng)
     print(f"[MedSec] After stratified sampling: {len(events)} events "
-          f"(target ≤ {max_output_rows})")
+          f"(target <= {max_output_rows})")
     return events
 
 

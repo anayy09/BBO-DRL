@@ -1,4 +1,4 @@
-﻿"""
+"""
 Abstract base class for all task-offloading schedulers.
 
 Every concrete scheduler must implement `select_node(task)` and may
@@ -8,6 +8,7 @@ optionally override `evaluate_node` if it needs custom cost components.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections import deque
 from typing import Dict, Optional, Tuple
 
 from src.core.cost_function import (
@@ -22,6 +23,10 @@ from src.core.cost_function import (
 from src.core.network import NetworkTopology
 from src.core.task import HealthcareTask
 
+# W = 50: sliding window size for routing-entropy privacy estimation.
+# Spans approximately five CI cycles; Section 3.4 and simulation setup.
+WINDOW_SIZE: int = 50
+
 
 class BaseScheduler(ABC):
     """
@@ -32,18 +37,30 @@ class BaseScheduler(ABC):
     topology : NetworkTopology
         The current network graph.
     offload_history : dict, optional
-        Per-device history of offloading decisions.
-        Structure: {device_id: {node_id: count}}
+        Per-device sliding-window history of offloading decisions.
+        Structure: {device_id: deque([node_id, node_id, ...])} with maxlen=WINDOW_SIZE.
+        Legacy dict-of-counts input is accepted and converted automatically.
     """
 
     def __init__(
         self,
         topology: NetworkTopology,
-        offload_history: Optional[Dict[int, Dict[int, int]]] = None,
+        offload_history: Optional[Dict] = None,
     ):
         self.topology = topology
-        # offload_history[device_id][node_id] = number of tasks sent there
-        self.offload_history: Dict[int, Dict[int, int]] = offload_history or {}
+        # FIX C6: use deque(maxlen=WINDOW_SIZE) per device for sliding-window entropy.
+        # Accept either legacy dict-of-counts or new deque format.
+        self.offload_history: Dict[int, deque] = {}
+        if offload_history:
+            for dev_id, hist in offload_history.items():
+                d: deque = deque(maxlen=WINDOW_SIZE)
+                if isinstance(hist, dict):
+                    # Convert legacy {node_id: count} to a flat deque
+                    for node_id, cnt in hist.items():
+                        d.extend([node_id] * min(cnt, WINDOW_SIZE))
+                elif hasattr(hist, '__iter__'):
+                    d.extend(hist)
+                self.offload_history[dev_id] = d
 
         # Pre-compute sorted list of all non-wearable candidate node IDs
         self._candidate_nodes = sorted(
@@ -146,11 +163,15 @@ class BaseScheduler(ABC):
         if is_local:
             privacy_risk = 0.0
         else:
-            device_history = self.offload_history.get(task.device_id, {})
+            # FIX C6: offload_history is now a deque; convert to counts for compute_privacy_risk
+            device_deque = self.offload_history.get(task.device_id, deque())
+            counts: Dict[int, int] = {}
+            for nid in device_deque:
+                counts[nid] = counts.get(nid, 0) + 1
             n_available = len(self._candidate_nodes)
             privacy_risk = compute_privacy_risk(
                 task.privacy_sensitivity,
-                device_history,
+                counts,
                 n_available,
             )
 
@@ -229,11 +250,10 @@ class BaseScheduler(ABC):
     # ------------------------------------------------------------------
 
     def record_decision(self, device_id: int, node_id: int) -> None:
-        """Update the offloading history after a scheduling decision."""
+        """Update the sliding-window offloading history after a scheduling decision."""
         if device_id not in self.offload_history:
-            self.offload_history[device_id] = {}
-        hist = self.offload_history[device_id]
-        hist[node_id] = hist.get(node_id, 0) + 1
+            self.offload_history[device_id] = deque(maxlen=WINDOW_SIZE)
+        self.offload_history[device_id].append(node_id)
 
     @property
     def candidate_nodes(self):

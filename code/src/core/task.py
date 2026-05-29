@@ -6,7 +6,8 @@ wearable device.  Task profiles are derived from published literature on
 clinical-grade biosignal processing workloads.
 
 References:
-  - ECG workload: Pan-Tompkins + DNN classifier ≈ 12 M cycles, 5 MB data
+  - ECG workload: 10-second window at 360 Hz, 16-bit depth = 3,600 samples
+    × 2 bytes = 7.2 KB = 57,600 bits; arrhythmia classifier ≈ 150 M cycles
   - SpO2: simple LED-ratio algorithm, ~500 K cycles, 5 KB data
   - BP (cuffless PPG): 2 M cycles, 50 KB data
   - Multi-vital fusion: aggregated pipeline, ~8 M cycles, 1 MB data
@@ -49,9 +50,9 @@ class HealthcareTask:
 # (Zhang 2021, Banbury 2021 MLPerf-Tiny).  Synchronised with event_generator.
 TASK_PROFILES = {
     'ecg_analysis': {
-        'data_size_bits':     40_000_000,
+        'data_size_bits':         57_600,   # 7.2 KB = 3600 samples × 16-bit (FIX C2)
         'cpu_cycles':        150_000_000,
-        'max_delay_s':        0.5,
+        'max_delay_s':              0.15,   # 150 ms clinical arrhythmia SLA (FIX C3)
         'privacy_sensitivity': 0.9,
     },
     'spo2_monitoring': {

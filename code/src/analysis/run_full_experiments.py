@@ -118,6 +118,13 @@ def _run_single(alg_name, sched_cls, n_tasks, run_id, topo, seed_base):
     epsilon_history = getattr(sched, 'epsilon_history', None)
     return metrics, (list(epsilon_history) if epsilon_history else None)
 
+def _run_single_wrapper(args):
+    alg, sched_cls, n_tasks, run_id, topo, seed_base = args
+    try:
+        m, eps_hist = _run_single(alg, sched_cls, n_tasks, run_id, topo, seed_base)
+        return run_id, m, eps_hist, None
+    except Exception as exc:
+        return run_id, None, None, str(exc)
 
 # ---------------------------------------------------------------------------
 # Main driver
@@ -126,6 +133,7 @@ def run_full(
     task_scales: list[int],
     n_runs: int,
     results_dir: Path,
+    workers: int = None,
 ) -> Dict:
     results_dir.mkdir(parents=True, exist_ok=True)
 
@@ -152,23 +160,22 @@ def run_full(
         print(f'\n[Q1-MC] Scale n={n_tasks}')
         for alg in alg_names:
             sched_cls = registry[alg]
-            it = range(n_runs)
-            if _TQDM:
-                it = tqdm(it, desc=f'  {alg:<10s}', leave=False, ncols=70)
-            for run_id in it:
-                try:
-                    m, eps_hist = _run_single(
-                        alg, sched_cls, n_tasks, run_id, topo, GLOBAL_SEED,
-                    )
+            args_list = [(alg, sched_cls, n_tasks, run_id, topo, GLOBAL_SEED) for run_id in range(n_runs)]
+            import concurrent.futures
+            
+            with concurrent.futures.ProcessPoolExecutor(max_workers=workers) as executor:
+                if _TQDM:
+                    it = tqdm(executor.map(_run_single_wrapper, args_list), total=n_runs, desc=f'  {alg:<10s}', leave=False, ncols=70)
+                else:
+                    it = executor.map(_run_single_wrapper, args_list)
+                
+                for run_id, m, eps_hist, err in it:
+                    if err:
+                        warnings.warn(f'[Q1-MC] {alg} n={n_tasks} run={run_id} failed: {err}')
+                        continue
                     mc_raw[n_tasks][alg].append(m)
-                    # Capture first run's epsilon trajectory at primary scale
-                    if (alg == 'BBO-DRL' and n_tasks == PRIMARY_SCALE
-                            and eps_hist is not None):
+                    if (alg == 'BBO-DRL' and n_tasks == PRIMARY_SCALE and eps_hist is not None):
                         eps_trajectories.setdefault(run_id, eps_hist)
-                except Exception as exc:
-                    warnings.warn(
-                        f'[Q1-MC] {alg} n={n_tasks} run={run_id} failed: {exc}'
-                    )
 
             # Aggregate
             agg = {}

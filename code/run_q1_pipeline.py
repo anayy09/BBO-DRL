@@ -88,6 +88,7 @@ def main():
             task_scales=args.scales or TASK_SCALES,
             n_runs=args.n_runs,
             results_dir=RESULTS_DIR,
+            workers=args.workers,
         )
 
     # ------------------------------------------------------------------

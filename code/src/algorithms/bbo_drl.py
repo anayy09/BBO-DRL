@@ -1,4 +1,4 @@
-﻿"""
+"""
 Hybrid BBO-DRL Scheduler â€” core research contribution.
 
 Architecture:
@@ -22,8 +22,9 @@ References:
   Mnih, V. et al. (2015). Human-level control through deep reinforcement
   learning. Nature, 518(7540), 529â€“533.
 
-  Wang, Y. et al. (2022). Bombardier beetle optimizer: A new metaheuristic
-  algorithm for continuous optimization. IEEE Access, 10, 35182â€“35196.
+  Zhang, Y., Liu, X., and Chen, W. (2025). Bombardier Beetle Optimizer: A
+  Novel Bio-Inspired Algorithm for Global Optimization.
+  arXiv preprint arXiv:2510.17005.
 """
 
 from __future__ import annotations
@@ -322,15 +323,27 @@ class BBOOptimizer:
 
             for k in range(self.n_pop):
                 X_k = population[k]
+                f_current = costs[k]  # FIX C5: retain for elitism
 
-                # --- Exploration candidate ---
+                # --- Exploration candidate (chemical spray, Eq. 28) ---
                 r1 = self._rng.random(dim)
                 r2 = self._rng.random(dim)
                 sign_vec = np.sign(self._rng.random(dim) - 0.5)
                 X_explore = X_k + r1 * (X_best - X_k) + r2 * delta * sign_vec
                 X_explore = np.clip(X_explore, lb, ub)
 
-                # --- Exploitation candidate ---
+                # --- Exploitation candidate (predator avoidance, Eq. 29) ---
+                # FIX C4: stochastically placed adversarial reference X_pred
+                pred_candidates = [j for j in range(self.n_pop) if j != k]
+                if pred_candidates:
+                    pred_idx = int(self._rng.integers(0, len(pred_candidates)))
+                    X_pred = population[pred_candidates[pred_idx]].copy()
+                else:
+                    X_pred = lb + self._rng.random(dim) * (ub - lb)
+                dist_k_pred = float(np.linalg.norm(X_k - X_pred))
+                dist_best_pred = float(np.linalg.norm(X_best - X_pred))
+                step_k = dist_k_pred / (dist_best_pred + 1e-12)
+
                 direction = X_best - X_k
                 dist = float(np.linalg.norm(direction))
                 if dist > 1e-12:
@@ -338,19 +351,20 @@ class BBOOptimizer:
                 else:
                     step_dir = self._rng.random(dim) - 0.5
                 r3 = float(self._rng.random())
-                X_exploit = X_k + r3 * step_dir * dist
+                X_exploit = X_k + r3 * step_k * step_dir
                 X_exploit = np.clip(X_exploit, lb, ub)
 
-                # --- Select better candidate ---
+                # --- Three-way elitist selection (FIX C5) ---
+                # Ensures each beetle's position is non-increasing in F(x).
                 f_explore = cost_fn(X_explore)
                 f_exploit = cost_fn(X_exploit)
 
-                if f_explore <= f_exploit:
-                    new_pop[k] = X_explore
-                    new_costs[k] = f_explore
+                if f_explore <= f_exploit and f_explore <= f_current:
+                    new_pop[k], new_costs[k] = X_explore, f_explore
+                elif f_exploit <= f_current:
+                    new_pop[k], new_costs[k] = X_exploit, f_exploit
                 else:
-                    new_pop[k] = X_exploit
-                    new_costs[k] = f_exploit
+                    new_pop[k], new_costs[k] = X_k, f_current  # retain current
 
             # Update population
             population = new_pop
@@ -685,7 +699,13 @@ class BBODRLScheduler(BaseScheduler):
         if K == 1:
             return self._idx_to_node[candidate_indices[0]]
 
-        # Map continuous position in [0, K-1] â†’ candidate node
+        # Map continuous position in [0, K-1] to candidate node.
+        # FIX C8: with K=3, the search space has only 3 distinct integer
+        # values {0, 1, 2}.  The BBO's continuous optimisation collapses to
+        # an exhaustive evaluation of 3 candidates, always finding the true
+        # optimum within the K-node subspace.  Routing diversity is driven by
+        # the DQN reward shaping that steers top-K selection, not by BBO
+        # landscape exploration of a continuous space.
         def bbo_cost(x: np.ndarray) -> float:
             idx_in_k = int(round(float(np.clip(x[0], 0.0, K - 1.0))))
             node_global_idx = candidate_indices[idx_in_k]

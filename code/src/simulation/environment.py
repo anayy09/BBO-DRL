@@ -1,4 +1,4 @@
-﻿"""
+"""
 Simulation environment for the IoT-Edge-Cloud task offloading system.
 
 The environment manages one round of scheduling decisions, tracking:
@@ -195,7 +195,10 @@ class OffloadingEnvironment:
         if is_local:
             privacy_risk = 0.0
         else:
-            device_history = self.scheduler.offload_history.get(task.device_id, {})
+            device_deque = self.scheduler.offload_history.get(task.device_id, [])
+            device_history: Dict[int, int] = {}
+            for nid in device_deque:
+                device_history[nid] = device_history.get(nid, 0) + 1
             n_available = len(self._compute_ids)
             privacy_risk = compute_privacy_risk(
                 task.privacy_sensitivity,
