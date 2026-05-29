@@ -1,4 +1,4 @@
-﻿"""
+"""
 IoT-Edge-Cloud network model.
 
 Models:
@@ -181,16 +181,16 @@ class NetworkTopology:
         lam = node.arrival_rate
 
         if lam <= 0.0:
-            return 0.0   # no load â€” no queue delay
+            return 0.0   # no load — no queue delay
 
         if lam >= mu:
             return 999.0  # overloaded / unstable queue
 
-        # M/M/1 mean waiting time in queue (excluding service): W_q = Î»/(Î¼(Î¼-Î»))
-        # Mean time in system (including service): W = 1/(Î¼-Î»)
-        # We return W (sojourn time) as the queuing component
-        W = 1.0 / (mu - lam)
-        return W
+        # M/D/1 mean waiting time in queue (excluding service): W_q = ρ / (2μ(1-ρ))
+        # The service time (t_proc) is added separately in compute_offload_latency.
+        rho = lam / mu
+        W_q = rho / (2.0 * mu * (1.0 - rho))
+        return W_q
 
     # ------------------------------------------------------------------
     # Propagation delay
