@@ -87,7 +87,7 @@ PRIVACY_ENTROPY_THRESHOLD: float = 0.85
 # ---------------------------------------------------------------------------
 # Real-trace evaluation (Fix 10)
 # ---------------------------------------------------------------------------
-MITBIH_N_RUNS:       int   = 30
+MITBIH_N_RUNS:       int   = 5
 MITBIH_PAYLOAD_BITS: int   = int(7.2 * 1024 * 8)   # 7.2 KB = 58_982 bits
 MITBIH_DEADLINE_S:   float = 0.150
 MITBIH_RHO:          float = 0.9

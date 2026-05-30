@@ -6,10 +6,8 @@ using the Pollaczek–Khinchine formula:
     E[W_G] = E[W_MM1] * (1 + c_v^2) / 2
 
 Runs all algorithms at N=1000 for 30 replicates under each c_v setting.
-All (cv, algorithm) pairs are executed concurrently via ProcessPoolExecutor,
-giving roughly cpu_count-fold speedup over the serial version.
-
-Saves results/mg1_sensitivity.json and results/table_mg1.csv.
+Optimized to simulate each run exactly once, then applying the latency scaling for each c_v in post-processing.
+Parallelized over individual runs instead of cv/alg pairs.
 """
 
 from __future__ import annotations
@@ -45,13 +43,9 @@ N_WORKERS = max(1, multiprocessing.cpu_count() - 1)
 # Top-level worker — must be importable (no closures) for multiprocessing
 # ---------------------------------------------------------------------------
 
-def _run_cv_alg_worker(args: tuple):
-    """Run N_RUNS_CV replicates for one (cv, alg_name) pair.
-
-    Builds its own topology and imports so each subprocess is self-contained.
-    Returns (cv, alg_name, list[dict]).
-    """
-    cv, alg_name, n_tasks, n_runs, seed_base, base_path = args
+def _run_single_worker(args: tuple):
+    """Run one replicate for one alg_name, and compute metrics for all cv values."""
+    run_id, alg_name, n_tasks, seed_base, base_path = args
 
     if base_path not in sys.path:
         sys.path.insert(0, base_path)
@@ -86,46 +80,50 @@ def _run_cv_alg_worker(args: tuple):
     topo = build_healthcare_topology(n_wearables=_NW, n_fog_nodes=_NF, seed=seed_base)
     sched_cls = get_full_algorithm_registry()[alg_name]
 
-    q_frac = 0.25
-    scale  = (1.0 + cv ** 2) / 2.0  # cv=1→1.0, cv=1.5→1.625, cv=2.5→3.625
+    try:
+        seed = seed_base + run_id * 1000 + n_tasks
+        _r.seed(seed)
+        _np.random.seed(seed)
 
-    runs = []
-    for run_id in range(n_runs):
-        try:
-            seed = seed_base + run_id * 1000 + n_tasks
-            _r.seed(seed)
-            _np.random.seed(seed)
+        sim_tasks = generate_synthetic_tasks(n_tasks, ci_distribution='mixed', seed=seed)
+        tasks = [_ht(t, topo) for t in sim_tasks]
 
-            sim_tasks = generate_synthetic_tasks(n_tasks, ci_distribution='mixed', seed=seed)
-            tasks = [_ht(t, topo) for t in sim_tasks]
+        sched = sched_cls(topo, seed=seed) if _accepts_seed(sched_cls) else sched_cls(topo)
+        env   = OffloadingEnvironment(topo, sched, n_tasks=n_tasks, seed=seed)
+        res   = env.run(tasks)
 
-            sched = sched_cls(topo, seed=seed) if _accepts_seed(sched_cls) else sched_cls(topo)
-            env   = OffloadingEnvironment(topo, sched, n_tasks=n_tasks, seed=seed)
-            res   = env.run(tasks)
+        if not res:
+            return run_id, alg_name, {}
 
-            if not res:
-                continue
+        q_frac = 0.25
+        dl = [t.max_delay_s * 1000.0 for t in tasks]
+        eng = float(_np.mean([r['energy_mj'] for r in res]))
+        priv = float(_np.mean([r['privacy_risk'] for r in res]))
 
+        cv_metrics = {}
+        for cv in CV_VALUES:
+            scale  = (1.0 + cv ** 2) / 2.0
             lats = []
             for r in res:
                 lat = r['latency_ms']
                 if r.get('node_type', '') != 'local':
                     lat = lat * (1 - q_frac) + lat * q_frac * scale
                 lats.append(lat)
-
-            dl   = [t.max_delay_s * 1000.0 for t in tasks]
+            
             sla  = 100.0 * sum(1 for l, d in zip(lats, dl) if l > d) / len(res)
-
-            runs.append({
-                'avg_latency_ms':    float(_np.mean(lats)),
-                'avg_energy_mj':     float(_np.mean([r['energy_mj']   for r in res])),
-                'avg_privacy_risk':  float(_np.mean([r['privacy_risk'] for r in res])),
+            
+            cv_metrics[cv] = {
+                'avg_latency_ms': float(_np.mean(lats)),
+                'avg_energy_mj': eng,
+                'avg_privacy_risk': priv,
                 'sla_violation_pct': sla,
-            })
-        except Exception as exc:
-            _w.warn(f'[M/G/1] {alg_name} cv={cv} run={run_id}: {exc}')
+            }
+        
+        return run_id, alg_name, cv_metrics
 
-    return cv, alg_name, runs
+    except Exception as exc:
+        _w.warn(f'[M/G/1] {alg_name} run={run_id}: {exc}')
+        return run_id, alg_name, {}
 
 
 # ---------------------------------------------------------------------------
@@ -147,39 +145,36 @@ def main():
     registry    = get_full_algorithm_registry()
     algs_to_test = [k for k in registry if k not in ('Local-Only', 'Cloud-Only')]
 
-    print(f'[M/G/1] {len(CV_VALUES)} cv values × {len(algs_to_test)} algorithms × '
-          f'{N_RUNS_CV} runs = {len(CV_VALUES)*len(algs_to_test)*N_RUNS_CV} total simulations')
-    print(f'[M/G/1] Workers: {N_WORKERS}  (parallelising over cv×algorithm pairs)')
-    print(f'[M/G/1] Algorithms: {algs_to_test}', flush=True)
+    print(f'[M/G/1 OPTIMIZED] {len(algs_to_test)} algorithms × {N_RUNS_CV} runs = {len(algs_to_test)*N_RUNS_CV} total simulations')
+    print(f'[M/G/1 OPTIMIZED] Workers: {N_WORKERS}')
+    print(f'[M/G/1 OPTIMIZED] Algorithms: {algs_to_test}', flush=True)
 
     job_args = [
-        (cv, alg, N_TASKS, N_RUNS_CV, GLOBAL_SEED, BASE)
-        for cv  in CV_VALUES
+        (run_id, alg, N_TASKS, GLOBAL_SEED, BASE)
         for alg in algs_to_test
+        for run_id in range(N_RUNS_CV)
     ]
 
-    raw: dict[float, dict[str, list]] = {cv: {} for cv in CV_VALUES}
+    # raw[cv][alg] = [run_metrics, ...]
+    raw: dict[float, dict[str, list]] = {cv: {alg: [] for alg in algs_to_test} for cv in CV_VALUES}
 
     with ProcessPoolExecutor(max_workers=N_WORKERS) as pool:
-        futures = {pool.submit(_run_cv_alg_worker, a): a for a in job_args}
+        futures = {pool.submit(_run_single_worker, a): a for a in job_args}
+        completed = 0
+        total = len(job_args)
         for fut in as_completed(futures):
+            completed += 1
             try:
-                cv, alg_name, runs = fut.result()
+                run_id, alg_name, cv_metrics = fut.result()
+                if cv_metrics:
+                    for cv in CV_VALUES:
+                        raw[cv][alg_name].append(cv_metrics[cv])
             except Exception as exc:
-                _, alg_name, *_ = futures[fut]
-                print(f'  [ERROR] {alg_name}: {exc}', flush=True)
-                continue
-            raw[cv][alg_name] = runs
-            if runs:
-                m = _agg(runs, 'avg_latency_ms')
-                p = _agg(runs, 'avg_privacy_risk')
-                s = _agg(runs, 'sla_violation_pct')
-                print(f'  [cv={cv:.1f}] {alg_name:<10}  '
-                      f'lat={m["mean"]:.2f}±{m["std"]:.2f}  '
-                      f'priv={p["mean"]:.4f}  sla={s["mean"]:.2f}%  '
-                      f'({len(runs)} runs)', flush=True)
-            else:
-                print(f'  [cv={cv:.1f}] {alg_name:<10}  NO RESULTS', flush=True)
+                run_id, alg_name, *_ = futures[fut]
+                print(f'  [ERROR] {alg_name} run={run_id}: {exc}', flush=True)
+            
+            if completed % 10 == 0 or completed == total:
+                print(f'  [Progress] {completed}/{total} runs completed.', flush=True)
 
     # Aggregate
     results: dict[float, dict] = {cv: {} for cv in CV_VALUES}

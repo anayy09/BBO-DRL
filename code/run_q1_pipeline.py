@@ -123,7 +123,7 @@ def main():
         _header('Step 5 — MIT-BIH real-trace evaluation (Fix 10)')
         from src.analysis.mitbih_trace_eval import run_mitbih_trace
         run_mitbih_trace(DATA_DIR, RESULTS_DIR,
-                         n_runs=args.n_runs, workers=args.workers)
+                         workers=args.workers)
 
     # ------------------------------------------------------------------
     # Step 6: Publication figures (Fix 5, 7, 9; Fix A, B, D)
@@ -254,7 +254,7 @@ def _write_framing_note(results_dir: Path) -> None:
     scale_key = '1000'
     cell = summary.get(scale_key, {})
     bbodrl  = cell.get('DQN-ES',  {})
-    psodqn  = cell.get({})
+    psodqn  = cell.get('PSO+DQN', {})
 
     metrics = ['avg_latency_ms', 'avg_energy_mj',
                'avg_privacy_risk', 'sla_violation_pct']
