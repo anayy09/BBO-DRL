@@ -89,44 +89,49 @@ plt.rcParams.update({
 # vermillion (D55E00), reddish purple (CC79A7), blue (0072B2), black (000000)
 # ---------------------------------------------------------------------------
 COLORS: Dict[str, str] = {
-    'DQN-ES':    '#D55E00',   # vermillion — single emphasised series
-    'PSO':    '#E69F00',   # bright orange — Fix A: control condition
+    'DQN-ES':    '#D55E00',   # vermillion — primary method
+    'PSO+DQN':   '#E69F00',   # bright orange — attribution control
     'ES-only':   '#CC79A7',   # reddish purple
-    'DQN-only':   '#0072B2',   # blue
-    'PSO':        '#009E73',   # green
-    'ACO':        '#F0E442',   # yellow
-    'HS-HHO':     '#56B4E9',   # sky blue
-    'Local-Only': '#999999',   # neutral gray
-    'Cloud-Only': '#000000',   # black
+    'DQN-only':  '#0072B2',   # blue
+    'PSO':       '#009E73',   # green
+    'ACO':       '#F0E442',   # yellow
+    'HS-HHO':    '#56B4E9',   # sky blue
+    'Local-Only':'#999999',   # neutral gray
+    'Cloud-Only':'#000000',   # black
 }
 MARKERS: Dict[str, str] = {
     'DQN-ES':    'o',
-    'PSO':    'h',         # hexagon — Fix A
+    'PSO+DQN':   'h',         # hexagon — attribution control
     'ES-only':   's',
-    'DQN-only':   'D',
-    'PSO':        '^',
-    'ACO':        'v',
-    'HS-HHO':     'P',
-    'Local-Only': 'X',
-    'Cloud-Only': '*',
+    'DQN-only':  'D',
+    'PSO':       '^',
+    'ACO':       'v',
+    'HS-HHO':    'P',
+    'Local-Only':'X',
+    'Cloud-Only':'*',
 }
-# Default order across every figure (Fix A: PSO+DQN added)
+# Default order across every figure
 DEFAULT_ORDER: List[str] = [
-    'DQN-ES', 'ES-only', 'DQN-only',
+    'DQN-ES', 'PSO+DQN', 'ES-only', 'DQN-only',
     'PSO', 'ACO', 'HS-HHO',
     'Local-Only', 'Cloud-Only',
 ]
 
 
 def _style_for(alg: str) -> dict:
-    """Per-algorithm style overrides.  DQN-ES is emphasised."""
+    """Per-algorithm style overrides.  DQN-ES and PSO+DQN are emphasised."""
     if alg == 'DQN-ES':
         return dict(linewidth=1.8, markersize=5.5, zorder=10,
                     markerfacecolor=COLORS[alg],
                     markeredgecolor=COLORS[alg])
+    if alg == 'PSO+DQN':
+        return dict(linewidth=1.4, markersize=5.0, zorder=9,
+                    linestyle='--',
+                    markerfacecolor=COLORS[alg],
+                    markeredgecolor=COLORS[alg])
     return dict(linewidth=0.9, markersize=4.0, zorder=5,
                 markerfacecolor='white',
-                markeredgecolor=COLORS[alg])
+                markeredgecolor=COLORS.get(alg, '#888888'))
 
 
 def _bar_legend_handles(algs: Sequence[str]) -> List[Patch]:
