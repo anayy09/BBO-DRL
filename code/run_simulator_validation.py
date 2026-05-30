@@ -114,13 +114,13 @@ def analytical_values():
 def simulator_values(topo, n_runs: int = 30, seed_base: int = 42):
     """Extract same metrics from the simulator across multiple runs."""
     from src.algorithms.cloud_only import CloudOnlyScheduler
-    from src.algorithms.bbo_drl import BBODRLScheduler
+    from src.algorithms.dqn_es import DQNESScheduler
     from src.core.task import HealthcareTask
     from src.data_ingestion.event_generator import generate_synthetic_tasks
     from src.simulation.environment import OffloadingEnvironment
     import random as _r
 
-    # Run N_RUNS=30 BBO-DRL runs and collect edge-routed ECG task metrics
+    # Run N_RUNS=30 DQN-ES runs and collect edge-routed ECG task metrics
     edge_lats = []
     local_lats = []
     offload_energies = []
@@ -148,7 +148,7 @@ def simulator_values(topo, n_runs: int = 30, seed_base: int = 42):
                 source='ecg',
             ))
 
-        sched = BBODRLScheduler(topo, seed=seed)
+        sched = DQNESScheduler(topo, seed=seed)
         env = OffloadingEnvironment(topo, sched, n_tasks=N_TASKS, seed=seed)
         results = env.run(tasks)
 

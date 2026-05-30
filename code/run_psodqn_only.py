@@ -159,15 +159,15 @@ def main():
     bbo_summ_path = RESULTS_DIR / 'mc_full_summary.json'
     with open(bbo_summ_path) as fh:
         full = json.load(fh)
-    bbo_priv = full['1000']['BBO-DRL']['avg_privacy_risk']['mean']
+    bbo_priv = full['1000']['DQN-ES']['avg_privacy_risk']['mean']
     pso_priv = n1000['avg_privacy_risk']['mean']
     diff_pct = 100.0 * (pso_priv - bbo_priv) / max(abs(bbo_priv), 1e-9)
-    print(f'\n[FRAMING] BBO-DRL privacy={bbo_priv:.4f}  PSO+DQN privacy={pso_priv:.4f}  diff={diff_pct:+.1f}%')
+    print(f'\n[FRAMING] DQN-ES privacy={bbo_priv:.4f}  PSO+DQN privacy={pso_priv:.4f}  diff={diff_pct:+.1f}%')
     if bbo_priv < pso_priv * 0.95:
         print('  → BBO inner loop provides measurable privacy benefit over PSO inner loop.')
         print('    Central attribution claim is supported.')
     elif abs(diff_pct) < 5.0:
-        print('  → BBO-DRL and PSO+DQN are within 5% on privacy.')
+        print('  → DQN-ES and PSO+DQN are within 5% on privacy.')
         print('    REFRAME: contribution is DRL+bio-inspired coupling, not BBO specifically.')
     else:
         print('  → Mixed — review metric-by-metric before finalising framing.')

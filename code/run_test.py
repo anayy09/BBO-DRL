@@ -5,7 +5,7 @@ sys.path.insert(0, BASE)
 
 from src.simulation.topology import build_healthcare_topology
 from src.simulation.environment import OffloadingEnvironment
-from src.algorithms.bbo_drl import BBODRLScheduler
+from src.algorithms.dqn_es import DQNESScheduler
 from src.algorithms.pso import PSOScheduler
 from src.algorithms.aco import ACOScheduler
 from src.algorithms.hs_hho import HSHHOScheduler
@@ -42,7 +42,7 @@ schedulers = [
     ('PSO', PSOScheduler),
     ('ACO', ACOScheduler),
     ('HS-HHO', HSHHOScheduler),
-    ('BBO-DRL', BBODRLScheduler),
+    ('DQN-ES', DQNESScheduler),
 ]
 
 for name, sched_cls in schedulers:

@@ -1,4 +1,4 @@
-# BBO-DRL Simulation Framework — Code Directory
+# DQN-ES Simulation Framework — Code Directory
 
 Technical reference for the simulation codebase. Covers architecture, module descriptions, design decisions, reproducibility controls, and extension guides.
 
@@ -179,12 +179,12 @@ CloudOnly            ~143           ~0.002         0.8800    ~83/500
 PSO                   ~61           ~0.041         ~0.320    ~44/500
 ACO                   ~58           ~0.040         ~0.310    ~41/500
 HS-HHO                ~56           ~0.038         ~0.290    ~36/500
-BBO-DRL               ~39           ~0.030         ~0.210    ~18/500
+DQN-ES                ~39           ~0.030         ~0.210    ~18/500
 
 All schedulers completed successfully.
 ```
 
-Exact values depend on NumPy version and platform due to floating-point differences in matrix operations. The relative ranking (BBO-DRL achieves lowest SLA violations and lowest average latency among the metaheuristic schedulers) should be stable across platforms.
+Exact values depend on NumPy version and platform due to floating-point differences in matrix operations. The relative ranking (DQN-ES achieves lowest SLA violations and lowest average latency among the metaheuristic schedulers) should be stable across platforms.
 
 ---
 
