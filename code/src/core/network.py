@@ -186,10 +186,10 @@ class NetworkTopology:
         if lam >= mu:
             return 999.0  # overloaded / unstable queue
 
-        # M/D/1 mean waiting time in queue (excluding service): W_q = ρ / (2μ(1-ρ))
+        # M/M/1 mean waiting time in queue: W_q = ρ / (μ(1-ρ))
         # The service time (t_proc) is added separately in compute_offload_latency.
         rho = lam / mu
-        W_q = rho / (2.0 * mu * (1.0 - rho))
+        W_q = rho / (mu * (1.0 - rho))
         return W_q
 
     # ------------------------------------------------------------------

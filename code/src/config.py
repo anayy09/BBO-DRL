@@ -87,9 +87,9 @@ PRIVACY_ENTROPY_THRESHOLD: float = 0.85
 # ---------------------------------------------------------------------------
 # Real-trace evaluation (Fix 10)
 # ---------------------------------------------------------------------------
-MITBIH_N_RUNS:       int   = 5
-MITBIH_PAYLOAD_BITS: int   = int(7.2 * 1024 * 8)   # 7.2 KB = 58_982 bits
-MITBIH_DEADLINE_S:   float = 0.150
+MITBIH_N_RUNS:       int   = 30
+MITBIH_PAYLOAD_BITS: int   = int(5 * 1024 * 1024 * 8)  # 5 MB — matches main simulation ECG task profile
+MITBIH_DEADLINE_S:   float = 0.500                   # 500 ms ECG SLA (matches paper's stated SLA)
 MITBIH_RHO:          float = 0.9
 
 
@@ -127,9 +127,11 @@ def get_full_algorithm_registry():
     from src.algorithms.hs_hho import HSHHOScheduler
     from src.algorithms.local_only import LocalOnlyScheduler
     from src.algorithms.pso import PSOScheduler
+    from src.algorithms.pso_dqn import PSODQNScheduler
 
     return {
         'DQN-ES':     DQNESScheduler,
+        'PSO+DQN':    PSODQNScheduler,
         'ES-only':    ESOnlyScheduler,
         'DQN-only':   DQNOnlyScheduler,
         'PSO':        PSOScheduler,
