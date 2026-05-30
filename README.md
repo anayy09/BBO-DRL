@@ -1,6 +1,6 @@
-# BBO-DRL: Bio-Inspired Adaptive Task Offloading for IoT-Edge-Cloud Healthcare Networks
+# DQN-ES: Deep Reinforcement Learning with Exact Combinatorial Search for Adaptive Task Offloading in IoT-Edge-Cloud Healthcare Networks
 
-A hybrid Bombardier Beetle Optimizer / Deep Q-Network scheduling system for privacy-aware, Criticality-Index-adaptive task offloading in IoMT deployments.
+A hybrid Deep Q-Network and Exhaustive Search scheduling system for privacy-aware, Criticality-Index-adaptive task offloading in IoMT deployments.
 
 ---
 
@@ -33,10 +33,10 @@ Bio-Inspired Adaptive Task Offloading System/
 
 | Name | File | Description |
 |------|------|-------------|
-| **BBO-DRL** | `bbo_drl.py` | Proposed method: DQN top-K pre-filter + BBO inner search |
-| **PSO+DQN** | `pso_dqn.py` | Ablation hybrid: same DQN architecture, PSO replaces BBO inner search |
-| **BBO-only** | `bbo_only.py` | BBO over full candidate set, no DQN pre-filter |
-| **DQN-only** | `dqn_only.py` | DQN argmax, no BBO refinement |
+| **DQN-ES** | `dqn_es.py` | Proposed method: DQN top-K pre-filter + exhaustive inner search |
+| **PSO+DQN** | `pso_dqn.py` | Ablation hybrid: same DQN architecture, PSO replaces exhaustive inner search |
+| **ES-only** | `es_only.py` | Exhaustive search over full candidate set, no DQN pre-filter |
+| **DQN-only** | `dqn_only.py` | DQN argmax, no inner search refinement |
 | PSO | `pso.py` | Per-task particle swarm, stateless |
 | ACO | `aco.py` | Pheromone-reinforcement ant colony |
 | HS-HHO | `hs_hho.py` | Slime Mould + Harris Hawks hybrid (strongest published comparator) |
@@ -102,7 +102,7 @@ Runs all nine schedulers on 500 synthetic tasks without any dataset download:
 python code/run_test.py
 ```
 
-Expected output confirms that all schedulers complete without error and that BBO-DRL leads on privacy risk while PSO/HS-HHO lead on latency (exact numbers vary by platform and seed).
+Expected output confirms that all schedulers complete without error and that DQN-ES leads on privacy risk while PSO/HS-HHO lead on latency (exact numbers vary by platform and seed).
 
 ---
 
@@ -113,15 +113,15 @@ The main orchestrator is `code/run_q1_pipeline.py`. It runs all experiment steps
 ```bash
 # Full pipeline — all steps, 30 runs, 5 task scales (N = 100, 500, 1000, 2000, 5000)
 # Warning: this takes several hours on a standard laptop
-python code/run_q1_pipeline.py --n_runs 30
+python code/run_q1_pipeline.py --n_runs 30 --workers 8
 
 # Run individual steps
 python code/run_q1_pipeline.py --n_runs 30 --skip-stats --skip-weight --skip-privacy \
-    --skip-mitbih --skip-figures --skip-highci --skip-overhead --skip-decomp --skip-routing
+    --skip-mitbih --skip-figures --skip-highci --skip-overhead --skip-decomp --skip-routing --skip-mg1
 # (runs Step 1 — Monte Carlo only)
 
 python code/run_q1_pipeline.py --n_runs 30 --skip-mc --skip-weight --skip-privacy \
-    --skip-mitbih --skip-figures --skip-highci --skip-overhead --skip-decomp --skip-routing
+    --skip-mitbih --skip-figures --skip-highci --skip-overhead --skip-decomp --skip-routing --skip-mg1
 # (runs Step 2 — Wilcoxon + Bonferroni tests only)
 ```
 
@@ -130,21 +130,22 @@ python code/run_q1_pipeline.py --n_runs 30 --skip-mc --skip-weight --skip-privac
 | Flag | Step | Deliverable |
 |------|------|-------------|
 | `--skip-mc` | Monte Carlo: all 9 schedulers × 5 scales × 30 runs | `results/mc_full_summary.json` |
-| `--skip-stats` | Wilcoxon rank-sum + Bonferroni (24 tests) | `results/table3_n1000_with_pvals.csv` |
+| `--skip-stats` | Wilcoxon rank-sum + Bonferroni (24 tests) | `results/table4_n1000_with_pvals.csv` |
 | `--skip-weight` | CI weight ablation, mixed-CI workload | `results/table5_weight_ablation.csv` |
 | `--skip-privacy` | Privacy Guard on MedSec-25 (sklearn AUC) | `results/privacy_guard_metrics.json` |
-| `--skip-mitbih` | MIT-BIH real-trace evaluation (8,640 windows) | `results/table5_mitbih_trace.csv` |
-| `--skip-figures` | All 10 publication figures | `latex/figures/fig*.pdf` |
-| `--skip-highci` | All-high-CI weight ablation (ICU scenario) | `results/table6_highci_weights.csv` |
+| `--skip-mitbih` | MIT-BIH real-trace evaluation (8,640 windows) | `results/table6_mitbih_trace.csv` |
+| `--skip-figures` | All 11 publication figures | `latex/figures/fig*.pdf` |
+| `--skip-highci` | All-high-CI weight ablation (ICU scenario) | `results/highci_weights.csv` |
 | `--skip-overhead` | Per-task scheduling wall-clock timing | `results/scheduling_overhead_summary.csv` |
 | `--skip-decomp` | Latency decomposition tx/queue/compute | `results/latency_decomposition.csv` |
 | `--skip-routing` | DQN-only routing distribution by quintile | `results/dqn_only_routing_summary.json` |
+| `--skip-mg1` | M/G/1 sensitivity analysis | `results/table_mg1.csv`, `latex/figures/fig11_mg1_sensitivity.pdf` |
 
-A framing note (`results/framing_note.txt`) comparing BBO-DRL vs PSO+DQN on privacy is generated automatically at the end of every run.
+A framing note (`results/framing_note.txt`) comparing DQN-ES vs PSO+DQN on privacy is generated automatically at the end of every run.
 
 ### Parallel processing
 
-All multi-run steps use `multiprocessing.Pool` with a `spawn` context (Windows-safe). The worker count defaults to `cpu_count - 1`; override with `--workers N`.
+All multi-run steps use `multiprocessing.Pool` with a `spawn` context (Windows-safe). The worker count defaults to `cpu_count - 1`; override with `--workers N`. Parallel processing is fully supported across all major statistical, ablation, and trace-evaluation steps.
 
 ---
 
@@ -154,7 +155,7 @@ If you have existing result files and only need to regenerate figures:
 
 ```bash
 python code/run_q1_pipeline.py --n_runs 30 --skip-mc --skip-stats --skip-weight \
-    --skip-privacy --skip-mitbih --skip-highci --skip-overhead --skip-decomp --skip-routing
+    --skip-privacy --skip-mitbih --skip-highci --skip-overhead --skip-decomp --skip-routing --skip-mg1
 ```
 
 Or directly:
@@ -170,15 +171,8 @@ python code/regen_figures.py
 1. `pip install -r code/requirements.txt`
 2. Download datasets and run `python code/run_data_ingestion.py`
 3. `python code/run_test.py` — verify all schedulers work
-4. `python code/run_q1_pipeline.py --n_runs 30` — full pipeline (~4–6 hours)
-5. Check `results/framing_note.txt` for PSO+DQN vs BBO-DRL assessment before finalising manuscript claims
-
----
-
-**Bombardier Beetle Optimizer:**
-```
-arXiv:2510.17005 (Oct 2025) — original algorithm and CEC 2017 benchmark results
-```
+4. `python code/run_q1_pipeline.py --n_runs 30 --workers 8` — full pipeline (~20-40 minutes on an 8-core machine)
+5. Check `results/framing_note.txt` for PSO+DQN vs DQN-ES assessment before finalising manuscript claims
 
 ---
 
